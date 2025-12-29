@@ -403,13 +403,25 @@ class _ComboOffScreenState extends State<ComboOffScreen> {
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        title: const Text('My Combo Offs'),
         elevation: 0,
+        backgroundColor: Colors.grey.shade600,
+        foregroundColor: Colors.white,
+        title: Row(
+          children: [
+            const Text(
+              'My Combo Offs',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(width: 8),
+          ],
+        ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: fetchComboOffs,
-            tooltip: 'Refresh',
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: Icon(
+              Icons.event_busy, // combo off icon
+              color: Colors.white,
+            ),
           ),
         ],
       ),

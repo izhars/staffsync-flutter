@@ -11,19 +11,31 @@ class AuthProvider with ChangeNotifier {
   User? _user;
   bool _isLoading = false;
   String? _error;
+  String? _fcmToken;
 
   User? get user => _user;
   bool get isLoading => _isLoading;
   String? get error => _error;
+  String? get fcmToken => _fcmToken;
 
-  /// 🔹 Login and save token
-  Future<bool> login(String email, String password) async {
+  /// Set FCM token
+  void setFcmToken(String token) {
+    _fcmToken = token;
+    notifyListeners();
+  }
+
+  /// 🔹 Login with FCM token
+  Future<bool> login(String email, String password, {String? fcmToken}) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      _user = await _authService.login(email, password);
+      _user = await _authService.login(
+        email,
+        password,
+        fcmToken: fcmToken ?? _fcmToken,
+      );
       _isLoading = false;
       notifyListeners();
       return _user != null;
@@ -33,6 +45,24 @@ class AuthProvider with ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  /// Update FCM token on server
+  Future<bool> updateFcmTokenOnServer(String token) async {
+    try {
+      final success = await _authService.updateFcmToken(token);
+      if (success) {
+        _fcmToken = token;
+      }
+      return success;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Get stored FCM token
+  Future<String?> getStoredFcmToken() async {
+    return await _authService.getStoredFcmToken();
   }
 
   /// Send forgot password request

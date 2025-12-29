@@ -1,9 +1,9 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shimmer/shimmer.dart';
+import '../models/about.dart';
 
 class AboutPage extends StatefulWidget {
   const AboutPage({Key? key}) : super(key: key);
@@ -30,19 +30,19 @@ class _AboutPageState extends State<AboutPage> with SingleTickerProviderStateMix
 
   void _initializeAnimations() {
     _animationController = AnimationController(
-      duration: const Duration(milliseconds: 1000),
+      duration: const Duration(milliseconds: 1200),
       vsync: this,
     );
 
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _animationController,
-        curve: Curves.easeInOut,
+        curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
       ),
     );
 
     _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.1),
+      begin: const Offset(0, 0.15),
       end: Offset.zero,
     ).animate(
       CurvedAnimation(
@@ -83,8 +83,9 @@ class _AboutPageState extends State<AboutPage> with SingleTickerProviderStateMix
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: Colors.red,
+        backgroundColor: const Color(0xFFEF4444),
         behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
@@ -104,8 +105,31 @@ class _AboutPageState extends State<AboutPage> with SingleTickerProviderStateMix
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
+      extendBodyBehindAppBar: true,
       appBar: _buildAppBar(),
-      body: _buildBody(),
+      body: Stack(
+        children: [
+          _buildBackgroundGradient(),
+          _buildBody(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBackgroundGradient() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: RadialGradient(
+          center: Alignment.topRight,
+          radius: 1.5,
+          colors: [
+            const Color(0xFF3B82F6).withOpacity(0.05),
+            const Color(0xFF8B5CF6).withOpacity(0.03),
+            const Color(0xFFF8FAFC),
+          ],
+          stops: const [0.0, 0.4, 1.0],
+        ),
+      ),
     );
   }
 
@@ -117,16 +141,24 @@ class _AboutPageState extends State<AboutPage> with SingleTickerProviderStateMix
         'About Us',
         style: TextStyle(
           color: Color(0xFF1E293B),
-          fontWeight: FontWeight.bold,
-          fontSize: 20,
+          fontWeight: FontWeight.w700,
+          fontSize: 22,
+          letterSpacing: -0.5,
         ),
       ),
       centerTitle: true,
       actions: [
         if (_dataState == DataState.error)
-          IconButton(
-            onPressed: _refreshData,
-            icon: const Icon(Icons.refresh, color: Color(0xFF3B82F6)),
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF3B82F6).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: IconButton(
+              onPressed: _refreshData,
+              icon: const Icon(Icons.refresh_rounded, color: Color(0xFF3B82F6)),
+            ),
           ),
       ],
     );
@@ -154,21 +186,31 @@ class _AboutPageState extends State<AboutPage> with SingleTickerProviderStateMix
           opacity: _fadeAnimation,
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.only(top: 100, left: 20, right: 20, bottom: 40),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _HeroSection(data: aboutData.about),
-                const SizedBox(height: 24),
-                _StatsGrid(stats: aboutData.stats),
                 const SizedBox(height: 32),
+                if (aboutData.stats.isNotEmpty) ...[
+                  _StatsGrid(stats: aboutData.stats),
+                  const SizedBox(height: 32),
+                ],
                 _MissionVisionSection(about: aboutData.about),
                 const SizedBox(height: 32),
-                _ValuesSection(values: aboutData.about.values),
-                const SizedBox(height: 32),
-                _TimelineSection(timeline: aboutData.timeline),
-                if (aboutData.team.isNotEmpty) ...[
+                if (aboutData.about.values.isNotEmpty) ...[
+                  _ValuesSection(values: aboutData.about.values),
                   const SizedBox(height: 32),
+                ],
+                if (aboutData.timeline.isNotEmpty) ...[
+                  _TimelineSection(timeline: aboutData.timeline),
+                  const SizedBox(height: 32),
+                ],
+                if (aboutData.achievements.isNotEmpty) ...[
+                  _AchievementsSection(achievements: aboutData.achievements),
+                  const SizedBox(height: 32),
+                ],
+                if (aboutData.team.isNotEmpty) ...[
                   _TeamSection(team: aboutData.team),
                 ],
               ],
@@ -180,149 +222,33 @@ class _AboutPageState extends State<AboutPage> with SingleTickerProviderStateMix
   }
 }
 
-// Data Models
 enum DataState { loading, success, error }
 
-class AboutDataModel {
-  final AboutSection about;
-  final List<StatItem> stats;
-  final List<TimelineItem> timeline;
-  final List<TeamMember> team;
-
-  AboutDataModel({
-    required this.about,
-    required this.stats,
-    required this.timeline,
-    required this.team,
-  });
-
-  factory AboutDataModel.fromJson(Map<String, dynamic> json) {
-    return AboutDataModel(
-      about: AboutSection.fromJson(json['about']),
-      stats: (json['stats'] as List)
-          .map((item) => StatItem.fromJson(item))
-          .toList(),
-      timeline: (json['timeline'] as List)
-          .map((item) => TimelineItem.fromJson(item))
-          .toList(),
-      team: (json['team'] as List)
-          .map((item) => TeamMember.fromJson(item))
-          .toList(),
-    );
-  }
-}
-
-class AboutSection {
-  final String companyName;
-  final String slogan;
-  final String description;
-  final String mission;
-  final String vision;
-  final List<String> values;
-
-  AboutSection({
-    required this.companyName,
-    required this.slogan,
-    required this.description,
-    required this.mission,
-    required this.vision,
-    required this.values,
-  });
-
-  factory AboutSection.fromJson(Map<String, dynamic> json) {
-    return AboutSection(
-      companyName: json['companyName'] ?? '',
-      slogan: json['slogan'] ?? '',
-      description: json['description'] ?? '',
-      mission: json['mission'] ?? '',
-      vision: json['vision'] ?? '',
-      values: (json['values'] as List<dynamic>).cast<String>(),
-    );
-  }
-}
-
-class StatItem {
-  final String label;
-  final String value;
-  final String suffix;
-
-  StatItem({required this.label, required this.value, required this.suffix});
-
-  factory StatItem.fromJson(Map<String, dynamic> json) {
-    return StatItem(
-      label: json['label'] ?? '',
-      value: json['value']?.toString() ?? '0',
-      suffix: json['suffix'] ?? '',
-    );
-  }
-}
-
-class TimelineItem {
-  final int year;
-  final String title;
-  final String description;
-
-  TimelineItem({
-    required this.year,
-    required this.title,
-    required this.description,
-  });
-
-  factory TimelineItem.fromJson(Map<String, dynamic> json) {
-    return TimelineItem(
-      year: json['year'] ?? 0,
-      title: json['title'] ?? '',
-      description: json['description'] ?? '',
-    );
-  }
-}
-
-class TeamMember {
-  final String name;
-  final String role;
-  final String? imageUrl;
-
-  TeamMember({required this.name, required this.role, this.imageUrl});
-
-  factory TeamMember.fromJson(Map<String, dynamic> json) {
-    return TeamMember(
-      name: json['name'] ?? '',
-      role: json['role'] ?? '',
-      imageUrl: json['imageUrl'],
-    );
-  }
-}
-
-// UI Components
 class _LoadingView extends StatelessWidget {
   const _LoadingView();
 
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.only(top: 100, left: 20, right: 20),
       children: [
         _buildShimmerHero(),
-        const SizedBox(height: 24),
+        const SizedBox(height: 32),
         _buildShimmerStats(),
         const SizedBox(height: 32),
         _buildShimmerCards(),
-        const SizedBox(height: 32),
-        _buildShimmerValues(),
-        const SizedBox(height: 32),
-        _buildShimmerTimeline(),
       ],
     );
   }
 
   Widget _buildShimmerHero() {
     return Shimmer.fromColors(
-      baseColor: Colors.grey[300]!,
-      highlightColor: Colors.grey[100]!,
+      baseColor: Colors.grey[200]!,
+      highlightColor: Colors.grey[50]!,
       child: Container(
-        height: 200,
+        height: 220,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(32),
           color: Colors.white,
         ),
       ),
@@ -335,18 +261,18 @@ class _LoadingView extends StatelessWidget {
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        childAspectRatio: 1.5,
+        childAspectRatio: 1.3,
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
       ),
       itemCount: 4,
       itemBuilder: (context, index) {
         return Shimmer.fromColors(
-          baseColor: Colors.grey[300]!,
-          highlightColor: Colors.grey[100]!,
+          baseColor: Colors.grey[200]!,
+          highlightColor: Colors.grey[50]!,
           child: Container(
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(24),
               color: Colors.white,
             ),
           ),
@@ -360,109 +286,17 @@ class _LoadingView extends StatelessWidget {
       children: List.generate(2, (index) => Padding(
         padding: const EdgeInsets.only(bottom: 16),
         child: Shimmer.fromColors(
-          baseColor: Colors.grey[300]!,
-          highlightColor: Colors.grey[100]!,
+          baseColor: Colors.grey[200]!,
+          highlightColor: Colors.grey[50]!,
           child: Container(
-            height: 120,
+            height: 140,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(24),
               color: Colors.white,
             ),
           ),
         ),
       )),
-    );
-  }
-
-  Widget _buildShimmerValues() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Shimmer.fromColors(
-          baseColor: Colors.grey[300]!,
-          highlightColor: Colors.grey[100]!,
-          child: Container(
-            width: 120,
-            height: 24,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(6),
-              color: Colors.white,
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: List.generate(6, (index) => Shimmer.fromColors(
-            baseColor: Colors.grey[300]!,
-            highlightColor: Colors.grey[100]!,
-            child: Container(
-              width: 80,
-              height: 36,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(30),
-                color: Colors.white,
-              ),
-            ),
-          )),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildShimmerTimeline() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Shimmer.fromColors(
-          baseColor: Colors.grey[300]!,
-          highlightColor: Colors.grey[100]!,
-          child: Container(
-            width: 120,
-            height: 24,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(6),
-              color: Colors.white,
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        ...List.generate(3, (index) => Padding(
-          padding: const EdgeInsets.only(bottom: 24),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Shimmer.fromColors(
-                baseColor: Colors.grey[300]!,
-                highlightColor: Colors.grey[100]!,
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Shimmer.fromColors(
-                  baseColor: Colors.grey[300]!,
-                  highlightColor: Colors.grey[100]!,
-                  child: Container(
-                    height: 100,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        )),
-      ],
     );
   }
 }
@@ -478,41 +312,49 @@ class _ErrorView extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.error_outline,
-            size: 64,
-            color: Colors.grey[400],
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: const Color(0xFF3B82F6).withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.cloud_off_rounded,
+              size: 64,
+              color: Color(0xFF64748B),
+            ),
           ),
-          const SizedBox(height: 16),
-          Text(
+          const SizedBox(height: 24),
+          const Text(
             'Unable to load data',
             style: TextStyle(
-              fontSize: 18,
-              color: Colors.grey[600],
-              fontWeight: FontWeight.w500,
+              fontSize: 22,
+              color: Color(0xFF1E293B),
+              fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 8),
-          Text(
+          const Text(
             'Please check your connection and try again',
-            style: TextStyle(color: Colors.grey[500]),
+            style: TextStyle(
+              color: Color(0xFF64748B),
+              fontSize: 15,
+            ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 32),
           ElevatedButton.icon(
             onPressed: onRetry,
-            icon: const Icon(Icons.refresh, size: 20),
-            label: const Text('Retry'),
+            icon: const Icon(Icons.refresh_rounded, size: 20),
+            label: const Text('Retry', style: TextStyle(fontWeight: FontWeight.w600)),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF3B82F6),
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
               ),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 24,
-                vertical: 12,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+              elevation: 0,
             ),
           ),
         ],
@@ -529,49 +371,72 @@ class _HeroSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)],
+          colors: [
+            Color(0xFF3B82F6),
+            Color(0xFF8B5CF6),
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(32),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF3B82F6).withOpacity(0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
+            blurRadius: 30,
+            offset: const Offset(0, 15),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Text(
+              '✨ Welcome',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
           Text(
             data.companyName,
             style: const TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.bold,
+              fontSize: 36,
+              fontWeight: FontWeight.w800,
               color: Colors.white,
+              height: 1.1,
+              letterSpacing: -1,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Text(
             data.slogan,
             style: const TextStyle(
               fontSize: 18,
-              color: Colors.white70,
+              color: Colors.white,
               fontWeight: FontWeight.w500,
+              height: 1.4,
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           Text(
             _stripHtmlTags(data.description),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 15,
-              color: Colors.white,
-              height: 1.6,
+              color: Colors.white.withOpacity(0.95),
+              height: 1.7,
             ),
           ),
         ],
@@ -596,13 +461,13 @@ class _StatsGrid extends StatelessWidget {
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        childAspectRatio: 1.4,
+        childAspectRatio: 1.2,
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
       ),
       itemCount: stats.length,
       itemBuilder: (context, index) {
-        return _StatCard(stat: stats[index]);
+        return _StatCard(stat: stats[index], index: index);
       },
     );
   }
@@ -610,21 +475,33 @@ class _StatsGrid extends StatelessWidget {
 
 class _StatCard extends StatelessWidget {
   final StatItem stat;
+  final int index;
 
-  const _StatCard({required this.stat});
+  const _StatCard({required this.stat, required this.index});
 
   @override
   Widget build(BuildContext context) {
+    final colors = [
+      [const Color(0xFF3B82F6), const Color(0xFF2563EB)],
+      [const Color(0xFF8B5CF6), const Color(0xFF7C3AED)],
+      [const Color(0xFF10B981), const Color(0xFF059669)],
+      [const Color(0xFFF59E0B), const Color(0xFFD97706)],
+    ];
+
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: colors[index % colors.length][0].withOpacity(0.2),
+          width: 1.5,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: colors[index % colors.length][0].withOpacity(0.15),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
@@ -634,13 +511,14 @@ class _StatCard extends StatelessWidget {
         children: [
           Text(
             '${stat.value}${stat.suffix}',
-            style: const TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF3B82F6),
+            style: TextStyle(
+              fontSize: 38,
+              fontWeight: FontWeight.w800,
+              color: colors[index % colors.length][0],
+              letterSpacing: -1,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Text(
             stat.label,
             style: const TextStyle(
@@ -665,16 +543,16 @@ class _MissionVisionSection extends StatelessWidget {
     return Column(
       children: [
         _InfoCard(
-          icon: Icons.flag_rounded,
-          color: const Color(0xFF10B981),
-          title: 'Mission',
+          icon: Icons.rocket_launch_rounded,
+          gradient: const [Color(0xFF10B981), Color(0xFF059669)],
+          title: 'Our Mission',
           content: about.mission,
         ),
         const SizedBox(height: 16),
         _InfoCard(
-          icon: Icons.visibility_rounded,
-          color: const Color(0xFF8B5CF6),
-          title: 'Vision',
+          icon: Icons.auto_awesome_rounded,
+          gradient: const [Color(0xFF8B5CF6), Color(0xFF7C3AED)],
+          title: 'Our Vision',
           content: about.vision,
         ),
       ],
@@ -684,13 +562,13 @@ class _MissionVisionSection extends StatelessWidget {
 
 class _InfoCard extends StatelessWidget {
   final IconData icon;
-  final Color color;
+  final List<Color> gradient;
   final String title;
   final String content;
 
   const _InfoCard({
     required this.icon,
-    required this.color,
+    required this.gradient,
     required this.title,
     required this.content,
   });
@@ -698,15 +576,19 @@ class _InfoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: gradient[0].withOpacity(0.2),
+          width: 1.5,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: gradient[0].withOpacity(0.15),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
@@ -714,12 +596,19 @@ class _InfoCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              shape: BoxShape.circle,
+              gradient: LinearGradient(colors: gradient),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: gradient[0].withOpacity(0.3),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-            child: Icon(icon, color: color, size: 24),
+            child: Icon(icon, color: Colors.white, size: 24),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -729,18 +618,19 @@ class _InfoCard extends StatelessWidget {
                 Text(
                   title,
                   style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
                     color: Color(0xFF1E293B),
+                    letterSpacing: -0.5,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 Text(
                   content,
                   style: const TextStyle(
                     fontSize: 15,
                     color: Color(0xFF64748B),
-                    height: 1.5,
+                    height: 1.6,
                   ),
                 ),
               ],
@@ -763,42 +653,44 @@ class _ValuesSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Our Values',
+          'Core Values',
           style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
+            fontSize: 28,
+            fontWeight: FontWeight.w800,
             color: Color(0xFF1E293B),
+            letterSpacing: -0.5,
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 20),
         Wrap(
           spacing: 12,
           runSpacing: 12,
-          children: values.map((value) {
+          children: values.asMap().entries.map((entry) {
+            final colors = [
+              [const Color(0xFF3B82F6), const Color(0xFF2563EB)],
+              [const Color(0xFF8B5CF6), const Color(0xFF7C3AED)],
+              [const Color(0xFF10B981), const Color(0xFF059669)],
+              [const Color(0xFFF59E0B), const Color(0xFFD97706)],
+              [const Color(0xFFEF4444), const Color(0xFFDC2626)],
+            ];
+            final colorIndex = entry.key % colors.length;
+
             return Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 20,
-                vertical: 12,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    const Color(0xFF3B82F6).withOpacity(0.1),
-                    const Color(0xFF8B5CF6).withOpacity(0.1),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(30),
+                color: colors[colorIndex][0].withOpacity(0.1),
+                borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: const Color(0xFF3B82F6).withOpacity(0.3),
+                  color: colors[colorIndex][0].withOpacity(0.3),
                   width: 1.5,
                 ),
               ),
               child: Text(
-                value,
-                style: const TextStyle(
+                entry.value,
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF3B82F6),
+                  color: colors[colorIndex][0],
                 ),
               ),
             );
@@ -822,19 +714,17 @@ class _TimelineSection extends StatelessWidget {
         const Text(
           'Our Journey',
           style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
+            fontSize: 28,
+            fontWeight: FontWeight.w800,
             color: Color(0xFF1E293B),
+            letterSpacing: -0.5,
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 20),
         ...timeline.asMap().entries.map((entry) {
-          final index = entry.key;
-          final item = entry.value;
-          final isLast = index == timeline.length - 1;
           return _TimelineItemWidget(
-            item: item,
-            isLast: isLast,
+            item: entry.value,
+            isLast: entry.key == timeline.length - 1,
           );
         }).toList(),
       ],
@@ -846,10 +736,7 @@ class _TimelineItemWidget extends StatelessWidget {
   final TimelineItem item;
   final bool isLast;
 
-  const _TimelineItemWidget({
-    required this.item,
-    required this.isLast,
-  });
+  const _TimelineItemWidget({required this.item, required this.isLast});
 
   @override
   Widget build(BuildContext context) {
@@ -859,8 +746,8 @@ class _TimelineItemWidget extends StatelessWidget {
         Column(
           children: [
             Container(
-              width: 40,
-              height: 40,
+              width: 48,
+              height: 48,
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)],
@@ -868,8 +755,8 @@ class _TimelineItemWidget extends StatelessWidget {
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF3B82F6).withOpacity(0.3),
-                    blurRadius: 8,
+                    color: const Color(0xFF3B82F6).withOpacity(0.4),
+                    blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
                 ],
@@ -879,8 +766,8 @@ class _TimelineItemWidget extends StatelessWidget {
                   item.year.toString(),
                   style: const TextStyle(
                     color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
                   ),
                 ),
               ),
@@ -888,23 +775,36 @@ class _TimelineItemWidget extends StatelessWidget {
             if (!isLast)
               Container(
                 width: 2,
-                height: 60,
-                color: const Color(0xFFE2E8F0),
+                height: 70,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      const Color(0xFF3B82F6).withOpacity(0.3),
+                      const Color(0xFFE2E8F0),
+                    ],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
+                ),
               ),
           ],
         ),
         const SizedBox(width: 16),
         Expanded(
           child: Container(
-            margin: const EdgeInsets.only(bottom: 24),
-            padding: const EdgeInsets.all(16),
+            margin: const EdgeInsets.only(bottom: 28),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: const Color(0xFFE2E8F0),
+                width: 1.5,
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
+                  color: const Color(0xFF3B82F6).withOpacity(0.08),
+                  blurRadius: 15,
                   offset: const Offset(0, 4),
                 ),
               ],
@@ -916,7 +816,7 @@ class _TimelineItemWidget extends StatelessWidget {
                   item.title,
                   style: const TextStyle(
                     fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w700,
                     color: Color(0xFF1E293B),
                   ),
                 ),
@@ -926,7 +826,7 @@ class _TimelineItemWidget extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 14,
                     color: Color(0xFF64748B),
-                    height: 1.4,
+                    height: 1.5,
                   ),
                 ),
               ],
@@ -934,6 +834,111 @@ class _TimelineItemWidget extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _AchievementsSection extends StatelessWidget {
+  final List<String> achievements;
+
+  const _AchievementsSection({required this.achievements});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Key Achievements',
+          style: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF1E293B),
+            letterSpacing: -0.5,
+          ),
+        ),
+        const SizedBox(height: 20),
+        Column(
+          children: achievements.asMap().entries.map((entry) {
+            return Padding(
+              padding: EdgeInsets.only(bottom: entry.key == achievements.length - 1 ? 0 : 12),
+              child: _AchievementItem(index: entry.key + 1, text: entry.value),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+}
+
+class _AchievementItem extends StatelessWidget {
+  final int index;
+  final String text;
+
+  const _AchievementItem({required this.index, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFFE2E8F0),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF10B981).withOpacity(0.08),
+            blurRadius: 15,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF10B981), Color(0xFF3B82F6)],
+              ),
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF10B981).withOpacity(0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Center(
+              child: Text(
+                index.toString(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                fontSize: 15,
+                color: Color(0xFF64748B),
+                height: 1.6,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -949,20 +954,21 @@ class _TeamSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Our Team',
+          'Meet Our Team',
           style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
+            fontSize: 28,
+            fontWeight: FontWeight.w800,
             color: Color(0xFF1E293B),
+            letterSpacing: -0.5,
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 20),
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
-            childAspectRatio: 0.9,
+            childAspectRatio: 0.85,
             crossAxisSpacing: 16,
             mainAxisSpacing: 16,
           ),
@@ -984,14 +990,18 @@ class _TeamMemberCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: const Color(0xFFE2E8F0),
+          width: 1.5,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
+            color: const Color(0xFF3B82F6).withOpacity(0.08),
+            blurRadius: 15,
             offset: const Offset(0, 4),
           ),
         ],
@@ -1000,44 +1010,52 @@ class _TeamMemberCard extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            width: 80,
-            height: 80,
+            width: 90,
+            height: 90,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)],
               ),
               shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF3B82F6).withOpacity(0.3),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
             ),
             child: member.imageUrl != null
                 ? ClipRRect(
-              borderRadius: BorderRadius.circular(40),
+              borderRadius: BorderRadius.circular(45),
               child: Image.network(
                 member.imageUrl!,
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) =>
-                const Icon(Icons.person, size: 40, color: Colors.white),
+                const Icon(Icons.person_rounded, size: 44, color: Colors.white),
               ),
             )
-                : const Icon(Icons.person, size: 40, color: Colors.white),
+                : const Icon(Icons.person_rounded, size: 44, color: Colors.white),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           Text(
             member.name,
             style: const TextStyle(
               fontSize: 16,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w700,
               color: Color(0xFF1E293B),
             ),
             textAlign: TextAlign.center,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Text(
             member.role,
             style: const TextStyle(
-              fontSize: 14,
+              fontSize: 13,
               color: Color(0xFF64748B),
+              fontWeight: FontWeight.w500,
             ),
             textAlign: TextAlign.center,
             maxLines: 2,

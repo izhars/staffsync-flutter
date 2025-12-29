@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../utils/validators.dart';
-import '../ForgotPasswordScreen.dart';
+import '../forgot_pass_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   @override

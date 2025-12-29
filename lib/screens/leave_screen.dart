@@ -34,8 +34,9 @@ class _LeavesScreenState extends State<LeavesScreen>
       if (!_tabController.indexIsChanging) {
         setState(() => _selectedTab = _tabController.index);
         _fetchLeavesWithStatus(
-            _tabController.index == 0 ? null : _tabs[_tabController.index].toLowerCase()
-        );
+            _tabController.index == 0
+                ? null
+                : _tabs[_tabController.index].toLowerCase());
       }
     });
     _loadUserRole();
@@ -80,7 +81,9 @@ class _LeavesScreenState extends State<LeavesScreen>
         title: Text('Cancel Leave'),
         content: Text('Are you sure you want to cancel this leave request?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: Text('No')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text('No')),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
@@ -120,6 +123,17 @@ class _LeavesScreenState extends State<LeavesScreen>
     }
   }
 
+  Future<void> _fetchLeavesWithStatus(String? status) async {
+    setState(() => _isLeavesLoading = true); // Changed from _isLoading
+    try {
+      final data = await _leaveService.getMyLeaves(status: status);
+      setState(() => _leaves = data.map((j) => Leave.fromJson(j)).toList());
+    } catch (e) {
+      _showSnackBar('Error: $e', isError: true);
+    } finally {
+      setState(() => _isLeavesLoading = false); // Changed from _isLoading
+    }
+  }
 
   Future<void> _fetchLeaveBalance() async {
     if (_userRole != 'employee') return;
@@ -144,24 +158,83 @@ class _LeavesScreenState extends State<LeavesScreen>
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
-      body: CustomScrollView(
-        slivers: [
-          _buildSliverAppBar(),
+      appBar: _buildAppBar(), // This must return an AppBar
+      body: Column(
+        children: [
           if (_userRole == 'employee') ...[
-            SliverToBoxAdapter(child: _buildLeaveBalanceCard()),
-            SliverToBoxAdapter(child: _buildEmployeeTabs()),
+            _buildLeaveBalanceCard(),
+            _buildEmployeeTabs(),
           ] else
-            SliverToBoxAdapter(child: _buildManagerHeader()),
-          _buildLeavesList(),
+            _buildManagerHeader(),
+          Expanded(
+            child: _buildLeavesList(),
+          ),
         ],
       ),
       floatingActionButton: _userRole == 'employee'
           ? FloatingActionButton.extended(
         onPressed: _openApplyLeaveSheet,
-        backgroundColor: Color(0xFF2E7D32),
-        foregroundColor: Colors.white, // <-- makes text & icon white
-        icon: Icon(Icons.add),
-        label: Text('Apply Leave'),
+        backgroundColor: const Color(0xFF2E7D32),
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.add),
+        label: const Text('Apply Leave'),
+      )
+          : null,
+    );
+  }
+
+  // Make sure _buildAppBar() returns an AppBar widget
+  AppBar _buildAppBar() {
+    final title = _userRole == 'employee' ? 'My Leaves' : 'Team Leaves';
+
+    return AppBar(
+      title: Row(
+        children: [
+          Text(
+            title,
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.25),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Text(
+              'Leaves',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
+      backgroundColor: Colors.green.shade600,
+      foregroundColor: Colors.white,
+      actions: [
+        Padding(
+          padding: const EdgeInsets.only(right: 12),
+          child: Icon(
+            Icons.beach_access,
+            color: Colors.white,
+          ),
+        ),
+      ],
+      bottom: _userRole != 'employee'
+          ? TabBar(
+        controller: _tabController,
+        tabs: _tabs
+            .map((t) => Tab(
+          child: Text(t,
+              style: TextStyle(fontWeight: FontWeight.w600)),
+        ))
+            .toList(),
+        indicatorColor: Colors.white,
+        labelColor: Colors.white,
+        unselectedLabelColor: Colors.white70,
       )
           : null,
     );
@@ -177,7 +250,12 @@ class _LeavesScreenState extends State<LeavesScreen>
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: Colors.green.withOpacity(0.3), blurRadius: 15, offset: Offset(0, 5))],
+        boxShadow: [
+          BoxShadow(
+              color: Colors.green.withOpacity(0.3),
+              blurRadius: 15,
+              offset: Offset(0, 5))
+        ],
       ),
       child: _isBalanceLoading
           ? _buildBalanceShimmer()
@@ -190,9 +268,14 @@ class _LeavesScreenState extends State<LeavesScreen>
           children: [
             Row(
               children: [
-                Icon(Icons.account_balance_wallet, color: Colors.white70, size: 24),
+                Icon(Icons.account_balance_wallet,
+                    color: Colors.white70, size: 24),
                 SizedBox(width: 8),
-                Text('Leave Balance', style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w500)),
+                Text('Leave Balance',
+                    style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500)),
               ],
             ),
             SizedBox(height: 16),
@@ -213,7 +296,11 @@ class _LeavesScreenState extends State<LeavesScreen>
   Widget _buildBalanceItem(String label, int count) {
     return Column(
       children: [
-        Text(count.toString(), style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
+        Text(count.toString(),
+            style: TextStyle(
+                color: Colors.white,
+                fontSize: 28,
+                fontWeight: FontWeight.bold)),
         SizedBox(height: 4),
         Text(label, style: TextStyle(color: Colors.white70, fontSize: 12)),
       ],
@@ -230,29 +317,6 @@ class _LeavesScreenState extends State<LeavesScreen>
           Container(height: 40, color: Colors.white24),
         ],
       ),
-    );
-  }
-
-  Widget _buildSliverAppBar() {
-    final title = _userRole == 'employee' ? 'My Leaves' : 'Team Leaves';
-    return SliverAppBar(
-      expandedHeight: 100,
-      floating: false,
-      pinned: true,
-      backgroundColor: Color(0xFF2E7D32),
-      flexibleSpace: FlexibleSpaceBar(
-        title: Text(title, style: TextStyle(fontWeight: FontWeight.bold)),
-        background: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF1B5E20), Color(0xFF2E7D32)],
-            ),
-          ),
-        ),
-      ),
-      actions: [
-        IconButton(icon: Icon(Icons.refresh), onPressed: _fetchData),
-      ],
     );
   }
 
@@ -300,41 +364,25 @@ class _LeavesScreenState extends State<LeavesScreen>
     );
   }
 
-  Future<void> _fetchLeavesWithStatus(String? status) async {
-    setState(() => _isLeavesLoading = true); // Changed from _isLoading
-    try {
-      final data = await _leaveService.getMyLeaves(status: status);
-      setState(() => _leaves = data.map((j) => Leave.fromJson(j)).toList());
-    } catch (e) {
-      _showSnackBar('Error: $e', isError: true);
-    } finally {
-      setState(() => _isLeavesLoading = false); // Changed from _isLoading
-    }
-  }
-
   Widget _buildLeavesList() {
-    if (_isLeavesLoading) { // Changed from _isLoading
-      return SliverFillRemaining(child: _buildShimmerList());
+    if (_isLeavesLoading) {
+      return _buildShimmerList();
     }
     if (_leaves.isEmpty) {
-      return SliverFillRemaining(child: _buildEmptyState());
+      return _buildEmptyState();
     }
 
-    return SliverPadding(
+    return ListView.builder(
       padding: EdgeInsets.all(16),
-      sliver: SliverList(
-        delegate: SliverChildBuilderDelegate(
-              (context, i) => _buildLeaveCard(_leaves[i]),
-          childCount: _leaves.length,
-        ),
-      ),
+      itemCount: _leaves.length,
+      itemBuilder: (context, index) => _buildLeaveCard(_leaves[index]),
     );
   }
 
   Widget _buildEmptyState() {
-    return Padding(
-      padding: const EdgeInsets.all(24.0),
-      child: Center(
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -366,7 +414,8 @@ class _LeavesScreenState extends State<LeavesScreen>
       itemBuilder: (context, index) => Container(
         height: 90,
         margin: EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(16)),
+        decoration: BoxDecoration(
+            color: Colors.grey[200], borderRadius: BorderRadius.circular(16)),
       ),
     );
   }
@@ -390,8 +439,10 @@ class _LeavesScreenState extends State<LeavesScreen>
             child: Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: _getStatusColor(leave.status).withOpacity(0.1),
-                  child: Icon(_getStatusIcon(leave.status), color: _getStatusColor(leave.status)),
+                  backgroundColor:
+                  _getStatusColor(leave.status).withOpacity(0.1),
+                  child: Icon(_getStatusIcon(leave.status),
+                      color: _getStatusColor(leave.status)),
                 ),
                 SizedBox(width: 16),
                 Expanded(
@@ -400,21 +451,26 @@ class _LeavesScreenState extends State<LeavesScreen>
                     children: [
                       Text(
                         isManager ? leave.employeeName : leave.displayLeaveType,
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        style:
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                       ),
                       if (isManager) ...[
                         SizedBox(height: 4),
-                        Text(leave.displayLeaveType, style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+                        Text(leave.displayLeaveType,
+                            style: TextStyle(color: Colors.grey[600], fontSize: 13)),
                       ],
                       SizedBox(height: 4),
-                      Text(leave.formattedDateRange, style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+                      Text(leave.formattedDateRange,
+                          style: TextStyle(color: Colors.grey[600], fontSize: 13)),
                     ],
                   ),
                 ),
                 if (isManager && leave.status == 'pending') ...[
-                  _buildActionButton('Approve', Colors.green, () => _approveLeave(leave.id)),
+                  _buildActionButton(
+                      'Approve', Colors.green, () => _approveLeave(leave.id)),
                   SizedBox(width: 8),
-                  _buildActionButton('Reject', Colors.red, () => _rejectLeave(leave.id)),
+                  _buildActionButton(
+                      'Reject', Colors.red, () => _rejectLeave(leave.id)),
                 ] else
                   Container(
                     padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -424,7 +480,10 @@ class _LeavesScreenState extends State<LeavesScreen>
                     ),
                     child: Text(
                       leave.status.toUpperCase(),
-                      style: TextStyle(color: _getStatusColor(leave.status), fontWeight: FontWeight.bold, fontSize: 11),
+                      style: TextStyle(
+                          color: _getStatusColor(leave.status),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11),
                     ),
                   ),
               ],
@@ -437,19 +496,27 @@ class _LeavesScreenState extends State<LeavesScreen>
 
   IconData _getStatusIcon(String status) {
     switch (status.toLowerCase()) {
-      case 'approved': return Icons.check_circle;
-      case 'rejected': return Icons.cancel;
-      case 'cancelled': return Icons.block;
-      default: return Icons.hourglass_bottom;
+      case 'approved':
+        return Icons.check_circle;
+      case 'rejected':
+        return Icons.cancel;
+      case 'cancelled':
+        return Icons.block;
+      default:
+        return Icons.hourglass_bottom;
     }
   }
 
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
-      case 'approved': return Colors.green;
-      case 'rejected': return Colors.red;
-      case 'cancelled': return Colors.grey;
-      default: return Colors.orange;
+      case 'approved':
+        return Colors.green;
+      case 'rejected':
+        return Colors.red;
+      case 'cancelled':
+        return Colors.grey;
+      default:
+        return Colors.orange;
     }
   }
 
@@ -515,7 +582,9 @@ class _LeavesScreenState extends State<LeavesScreen>
                 margin: EdgeInsets.only(top: 12),
                 width: 40,
                 height: 4,
-                decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+                decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2)),
               ),
               Expanded(
                 child: ListView(
@@ -527,27 +596,37 @@ class _LeavesScreenState extends State<LeavesScreen>
                         Container(
                           padding: EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: _getStatusColor(leave.status).withOpacity(0.1),
+                            color: _getStatusColor(leave.status)
+                                .withOpacity(0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Icon(_getStatusIcon(leave.status), color: _getStatusColor(leave.status), size: 28),
+                          child: Icon(_getStatusIcon(leave.status),
+                              color: _getStatusColor(leave.status), size: 28),
                         ),
                         SizedBox(width: 16),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(leave.displayLeaveType, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                              Text(leave.displayLeaveType,
+                                  style: TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.bold)),
                               SizedBox(height: 4),
                               Container(
-                                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                padding: EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: _getStatusColor(leave.status).withOpacity(0.1),
+                                  color: _getStatusColor(leave.status)
+                                      .withOpacity(0.1),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Text(
                                   leave.status.toUpperCase(),
-                                  style: TextStyle(color: _getStatusColor(leave.status), fontWeight: FontWeight.bold, fontSize: 12),
+                                  style: TextStyle(
+                                      color: _getStatusColor(leave.status),
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12),
                                 ),
                               ),
                             ],
@@ -556,30 +635,55 @@ class _LeavesScreenState extends State<LeavesScreen>
                       ],
                     ),
                     SizedBox(height: 24),
-                    _buildDetailRow(Icons.calendar_today, 'Duration', leave.formattedDateRange),
-                    _buildDetailRow(Icons.access_time, 'Total Days', leave.durationDisplay),
-                    _buildDetailRow(Icons.event, 'Applied On', _formatDate(leave.appliedOn)),
+                    _buildDetailRow(
+                        Icons.calendar_today, 'Duration', leave.formattedDateRange),
+                    _buildDetailRow(
+                        Icons.access_time, 'Total Days', leave.durationDisplay),
+                    _buildDetailRow(Icons.event, 'Applied On',
+                        _formatDate(leave.appliedOn)),
                     if (leave.reason.isNotEmpty) ...[
                       SizedBox(height: 16),
-                      Text('Reason', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.grey[700])),
+                      Text('Reason',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: Colors.grey[700])),
                       SizedBox(height: 8),
                       Container(
                         padding: EdgeInsets.all(12),
-                        decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(12)),
-                        child: Text(leave.reason, style: TextStyle(fontSize: 14, color: Colors.grey[800], height: 1.5)),
+                        decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            borderRadius: BorderRadius.circular(12)),
+                        child: Text(leave.reason,
+                            style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[800],
+                                height: 1.5)),
                       ),
                     ],
-                    if (leave.status == 'rejected' && leave.rejectionReason != null) ...[
+                    if (leave.status == 'rejected' &&
+                        leave.rejectionReason != null) ...[
                       SizedBox(height: 16),
-                      Text('Rejection Reason', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.red[700])),
+                      Text('Rejection Reason',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: Colors.red[700])),
                       SizedBox(height: 8),
                       Container(
                         padding: EdgeInsets.all(12),
-                        decoration: BoxDecoration(color: Colors.red[50], borderRadius: BorderRadius.circular(12)),
-                        child: Text(leave.rejectionReason!, style: TextStyle(fontSize: 14, color: Colors.red[900], height: 1.5)),
+                        decoration: BoxDecoration(
+                            color: Colors.red[50],
+                            borderRadius: BorderRadius.circular(12)),
+                        child: Text(leave.rejectionReason!,
+                            style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.red[900],
+                                height: 1.5)),
                       ),
                     ],
-                    if (leave.status == 'pending' || leave.status == 'approved') ...[
+                    if (leave.status == 'pending' ||
+                        leave.status == 'approved') ...[
                       SizedBox(height: 24),
                       SizedBox(
                         width: double.infinity,
@@ -589,7 +693,8 @@ class _LeavesScreenState extends State<LeavesScreen>
                             backgroundColor: Colors.red,
                             foregroundColor: Colors.white,
                             padding: EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
                           ),
                           icon: Icon(Icons.cancel),
                           label: Text('Cancel Leave'),
@@ -613,10 +718,13 @@ class _LeavesScreenState extends State<LeavesScreen>
         children: [
           Icon(icon, size: 20, color: Colors.grey[600]),
           SizedBox(width: 12),
-          Text('$label:', style: TextStyle(color: Colors.grey[600], fontSize: 14)),
+          Text('$label:',
+              style: TextStyle(color: Colors.grey[600], fontSize: 14)),
           SizedBox(width: 8),
           Expanded(
-            child: Text(value, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14), textAlign: TextAlign.right),
+            child: Text(value,
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                textAlign: TextAlign.right),
           ),
         ],
       ),
@@ -645,11 +753,9 @@ class _LeavesScreenState extends State<LeavesScreen>
     );
   }
 
-  // Replace your entire _openApplyLeaveSheet() method with this fixed version:
-
   void _openApplyLeaveSheet() {
     final _formKey = GlobalKey<FormState>();
-    String? _leaveType; // This is correctly defined here
+    String? _leaveType;
     DateTime? _startDate;
     DateTime? _endDate;
     String _leaveDuration = 'full';
@@ -676,7 +782,9 @@ class _LeavesScreenState extends State<LeavesScreen>
                   margin: EdgeInsets.only(top: 12),
                   width: 40,
                   height: 4,
-                  decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+                  decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2)),
                 ),
                 Expanded(
                   child: Form(
@@ -685,10 +793,12 @@ class _LeavesScreenState extends State<LeavesScreen>
                       controller: scrollController,
                       padding: EdgeInsets.all(24),
                       children: [
-                        Text('Apply for Leave', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                        Text('Apply for Leave',
+                            style: TextStyle(
+                                fontSize: 24, fontWeight: FontWeight.bold)),
                         SizedBox(height: 24),
 
-                        // Leave Type Dropdown - FIXED VERSION
+                        // Leave Type Dropdown
                         Container(
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(12),
@@ -698,10 +808,11 @@ class _LeavesScreenState extends State<LeavesScreen>
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton2<String>(
                               isExpanded: true,
-                              value: _leaveType, // NOW IT WILL WORK
+                              value: _leaveType,
                               hint: Row(
                                 children: [
-                                  Icon(Icons.category, size: 20, color: Colors.grey[600]),
+                                  Icon(Icons.category,
+                                      size: 20, color: Colors.grey[600]),
                                   SizedBox(width: 12),
                                   Text(
                                     'Select Leave Type',
@@ -712,11 +823,20 @@ class _LeavesScreenState extends State<LeavesScreen>
                                   ),
                                 ],
                               ),
-                              items: ['casual', 'sick', 'earned', 'combo', 'unpaid', 'maternity', 'paternity']
+                              items: [
+                                'casual',
+                                'sick',
+                                'earned',
+                                'combo',
+                                'unpaid',
+                                'maternity',
+                                'paternity'
+                              ]
                                   .map((type) => DropdownMenuItem(
                                 value: type,
                                 child: Container(
-                                  padding: EdgeInsets.symmetric(vertical: 8),
+                                  padding:
+                                  EdgeInsets.symmetric(vertical: 8),
                                   child: Row(
                                     children: [
                                       Container(
@@ -729,7 +849,8 @@ class _LeavesScreenState extends State<LeavesScreen>
                                       ),
                                       SizedBox(width: 12),
                                       Text(
-                                        type[0].toUpperCase() + type.substring(1),
+                                        type[0].toUpperCase() +
+                                            type.substring(1),
                                         style: TextStyle(
                                           fontSize: 15,
                                           fontWeight: FontWeight.w500,
@@ -741,7 +862,8 @@ class _LeavesScreenState extends State<LeavesScreen>
                                 ),
                               ))
                                   .toList(),
-                              onChanged: (val) => setModalState(() => _leaveType = val),
+                              onChanged: (val) =>
+                                  setModalState(() => _leaveType = val),
                               buttonStyleData: ButtonStyleData(
                                 height: 50,
                                 padding: EdgeInsets.only(left: 16, right: 12),
@@ -786,7 +908,11 @@ class _LeavesScreenState extends State<LeavesScreen>
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Leave Duration', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.grey[700])),
+                              Text('Leave Duration',
+                                  style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.grey[700])),
                               SizedBox(height: 8),
                               Row(
                                 children: [
@@ -794,7 +920,8 @@ class _LeavesScreenState extends State<LeavesScreen>
                                     child: RadioListTile<String>(
                                       contentPadding: EdgeInsets.zero,
                                       dense: true,
-                                      title: Text('Full Day', style: TextStyle(fontSize: 14)),
+                                      title: Text('Full Day',
+                                          style: TextStyle(fontSize: 14)),
                                       value: 'full',
                                       groupValue: _leaveDuration,
                                       onChanged: (val) {
@@ -809,11 +936,13 @@ class _LeavesScreenState extends State<LeavesScreen>
                                     child: RadioListTile<String>(
                                       contentPadding: EdgeInsets.zero,
                                       dense: true,
-                                      title: Text('Half Day', style: TextStyle(fontSize: 14)),
+                                      title: Text('Half Day',
+                                          style: TextStyle(fontSize: 14)),
                                       value: 'half',
                                       groupValue: _leaveDuration,
                                       onChanged: (val) {
-                                        setModalState(() => _leaveDuration = val!);
+                                        setModalState(
+                                                () => _leaveDuration = val!);
                                       },
                                     ),
                                   ),
@@ -830,16 +959,25 @@ class _LeavesScreenState extends State<LeavesScreen>
                             decoration: InputDecoration(
                               labelText: 'Half Day Type',
                               prefixIcon: Icon(Icons.schedule),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                              border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12)),
                               filled: true,
                               fillColor: Colors.grey[50],
                             ),
                             items: [
-                              DropdownMenuItem(value: 'first_half', child: Text('First Half (Morning)')),
-                              DropdownMenuItem(value: 'second_half', child: Text('Second Half (Afternoon)')),
+                              DropdownMenuItem(
+                                  value: 'first_half',
+                                  child: Text('First Half (Morning)')),
+                              DropdownMenuItem(
+                                  value: 'second_half',
+                                  child: Text('Second Half (Afternoon)')),
                             ],
-                            onChanged: (val) => setModalState(() => _halfDayType = val),
-                            validator: (val) => _leaveDuration == 'half' && val == null ? 'Please select half day type' : null,
+                            onChanged: (val) =>
+                                setModalState(() => _halfDayType = val),
+                            validator: (val) => _leaveDuration == 'half' &&
+                                val == null
+                                ? 'Please select half day type'
+                                : null,
                           ),
                         ],
 
@@ -867,13 +1005,20 @@ class _LeavesScreenState extends State<LeavesScreen>
                             decoration: InputDecoration(
                               labelText: 'Start Date',
                               prefixIcon: Icon(Icons.calendar_today),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                              border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12)),
                               filled: true,
                               fillColor: Colors.grey[50],
                             ),
                             child: Text(
-                              _startDate != null ? DateFormat('MMM dd, yyyy').format(_startDate!) : 'Select start date',
-                              style: TextStyle(color: _startDate != null ? Colors.black87 : Colors.grey[600]),
+                              _startDate != null
+                                  ? DateFormat('MMM dd, yyyy')
+                                  .format(_startDate!)
+                                  : 'Select start date',
+                              style: TextStyle(
+                                  color: _startDate != null
+                                      ? Colors.black87
+                                      : Colors.grey[600]),
                             ),
                           ),
                         ),
@@ -885,23 +1030,33 @@ class _LeavesScreenState extends State<LeavesScreen>
                             onTap: () async {
                               final picked = await showDatePicker(
                                 context: context,
-                                initialDate: _endDate ?? _startDate ?? DateTime.now(),
+                                initialDate:
+                                _endDate ?? _startDate ?? DateTime.now(),
                                 firstDate: _startDate ?? DateTime.now(),
-                                lastDate: DateTime.now().add(Duration(days: 365)),
+                                lastDate:
+                                DateTime.now().add(Duration(days: 365)),
                               );
-                              if (picked != null) setModalState(() => _endDate = picked);
+                              if (picked != null)
+                                setModalState(() => _endDate = picked);
                             },
                             child: InputDecorator(
                               decoration: InputDecoration(
                                 labelText: 'End Date',
                                 prefixIcon: Icon(Icons.event),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12)),
                                 filled: true,
                                 fillColor: Colors.grey[50],
                               ),
                               child: Text(
-                                _endDate != null ? DateFormat('MMM dd, yyyy').format(_endDate!) : 'Select end date',
-                                style: TextStyle(color: _endDate != null ? Colors.black87 : Colors.grey[600]),
+                                _endDate != null
+                                    ? DateFormat('MMM dd, yyyy')
+                                    .format(_endDate!)
+                                    : 'Select end date',
+                                style: TextStyle(
+                                    color: _endDate != null
+                                        ? Colors.black87
+                                        : Colors.grey[600]),
                               ),
                             ),
                           ),
@@ -915,13 +1070,15 @@ class _LeavesScreenState extends State<LeavesScreen>
                           decoration: InputDecoration(
                             labelText: 'Reason',
                             prefixIcon: Icon(Icons.description),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12)),
                             filled: true,
                             fillColor: Colors.grey[50],
                             alignLabelWithHint: true,
                           ),
                           maxLines: 4,
-                          validator: (val) => val!.isEmpty ? 'Please enter reason' : null,
+                          validator: (val) =>
+                          val!.isEmpty ? 'Please enter reason' : null,
                         ),
 
                         SizedBox(height: 24),
@@ -934,19 +1091,25 @@ class _LeavesScreenState extends State<LeavesScreen>
                               if (_formKey.currentState!.validate()) {
                                 // Validate leave type
                                 if (_leaveType == null) {
-                                  _showSnackBar('Please select leave type', isError: true);
+                                  _showSnackBar('Please select leave type',
+                                      isError: true);
                                   return;
                                 }
 
                                 if (_startDate == null) {
-                                  _showSnackBar('Please select start date', isError: true);
+                                  _showSnackBar('Please select start date',
+                                      isError: true);
                                   return;
                                 }
 
-                                final effectiveEndDate = _leaveDuration == 'half' ? _startDate : _endDate;
+                                final effectiveEndDate =
+                                _leaveDuration == 'half'
+                                    ? _startDate
+                                    : _endDate;
 
                                 if (effectiveEndDate == null) {
-                                  _showSnackBar('Please select end date', isError: true);
+                                  _showSnackBar('Please select end date',
+                                      isError: true);
                                   return;
                                 }
 
@@ -956,12 +1119,14 @@ class _LeavesScreenState extends State<LeavesScreen>
                                   final leaveData = {
                                     "leaveType": _leaveType,
                                     "startDate": _startDate!.toIso8601String(),
-                                    "endDate": effectiveEndDate!.toIso8601String(),
+                                    "endDate":
+                                    effectiveEndDate!.toIso8601String(),
                                     "reason": reasonController.text,
                                     "leaveDuration": _leaveDuration,
                                   };
 
-                                  if (_leaveDuration == 'half' && _halfDayType != null) {
+                                  if (_leaveDuration == 'half' &&
+                                      _halfDayType != null) {
                                     leaveData["halfDayType"] = _halfDayType!;
                                   }
 
@@ -969,7 +1134,9 @@ class _LeavesScreenState extends State<LeavesScreen>
                                   _showSnackBar('Leave applied successfully!');
                                   _fetchData();
                                 } catch (e) {
-                                  _showSnackBar('Failed to apply leave: ${e.toString()}', isError: true);
+                                  _showSnackBar(
+                                      'Failed to apply leave: ${e.toString()}',
+                                      isError: true);
                                 }
                               }
                             },
@@ -977,10 +1144,13 @@ class _LeavesScreenState extends State<LeavesScreen>
                               backgroundColor: Color(0xFF2E7D32),
                               foregroundColor: Colors.white,
                               padding: EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
                             ),
                             icon: Icon(Icons.send),
-                            label: Text('Submit Leave Application', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                            label: Text('Submit Leave Application',
+                                style: TextStyle(
+                                    fontSize: 16, fontWeight: FontWeight.bold)),
                           ),
                         ),
                       ],
@@ -1029,7 +1199,8 @@ class _LeavesScreenState extends State<LeavesScreen>
           maxLines: 3,
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context), child: Text('Cancel')),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, controller.text.trim()),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),

@@ -866,6 +866,10 @@ class _ReportScreenState extends State<ReportScreen> with TickerProviderStateMix
       }
     }
 
+    String _formatDate(DateTime date) {
+      return DateFormat('EEE, MMM d, yyyy').format(date);
+    }
+
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
@@ -927,122 +931,16 @@ class _ReportScreenState extends State<ReportScreen> with TickerProviderStateMix
               padding: EdgeInsets.all(12),
               child: Column(
                 children: events.map<Widget>((attendance) {
-                  final checkInRaw = attendance['checkInTimeFormatted'] ?? attendance['checkIn']?['time'];
-                  final checkOutRaw = attendance['checkOutTimeFormatted'] ?? attendance['checkOut']?['time'];
-
-                  final checkIn = _formatTime(checkInRaw);
-                  final checkOut = _formatTime(checkOutRaw);
-                  final workHours = attendance['workHours'] ?? 0;
+                  // Check if it's a holiday
                   final status = attendance['status'] ?? 'N/A';
-                  final isLate = attendance['isLate'] == true;
-                  final lateBy = attendance['lateBy'] ?? 0;
-                  final isShortAttendance = attendance['isShortAttendance'] == true;
-                  final shortByMinutes = attendance['shortByMinutes'] ?? 0;
 
-                  return Container(
-                    margin: EdgeInsets.symmetric(vertical: 8),
-                    padding: EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.indigo.shade50,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.indigo.shade100),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(Icons.verified_user, color: Colors.indigo, size: 20),
-                                SizedBox(width: 8),
-                                Text(
-                                  status.toUpperCase(),
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.indigo.shade700,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            Row(
-                              children: [
-                                if (isLate)
-                                  Container(
-                                    margin: EdgeInsets.only(left: 6),
-                                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: Colors.red.shade50,
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Text(
-                                      'Late by $lateBy min',
-                                      style: TextStyle(
-                                        color: Colors.red.shade600,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                if (isShortAttendance)
-                                  Container(
-                                    margin: EdgeInsets.only(left: 6),
-                                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: Colors.orange.shade50,
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Text(
-                                      'Short by $shortByMinutes min',
-                                      style: TextStyle(
-                                        color: Colors.orange.shade700,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 12),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            _buildTimeTile(
-                              icon: Icons.login_rounded,
-                              label: "Check-In",
-                              time: checkIn,
-                              color: Colors.green,
-                            ),
-                            SizedBox(width: 10),
-                            _buildTimeTile(
-                              icon: Icons.logout_rounded,
-                              label: "Check-Out",
-                              time: checkOut,
-                              color: Colors.red,
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Icon(Icons.access_time_rounded, color: Colors.amber[700], size: 20),
-                            SizedBox(width: 8),
-                            Text(
-                              'Work Hours: ${workHours.toStringAsFixed(2)} hrs',
-                              style: TextStyle(
-                                fontSize: 15,
-                                color: Colors.grey[800],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  );
+                  if (status == 'holiday') {
+                    // Show holiday card
+                    return _buildHolidayCard(attendance);
+                  } else {
+                    // Show regular attendance card
+                    return _buildAttendanceCard(attendance);
+                  }
                 }).toList(),
               ),
             ),
@@ -1051,6 +949,256 @@ class _ReportScreenState extends State<ReportScreen> with TickerProviderStateMix
     );
   }
 
+// Holiday Card Widget
+  Widget _buildHolidayCard(Map<String, dynamic> attendance) {
+    final holidayName = attendance['holidayName'] ?? 'Holiday';
+    final holidayType = attendance['holidayType'] ?? 'General';
+
+    // Determine icon based on holiday type
+    IconData holidayIcon = Icons.celebration_outlined;
+    Color holidayColor = Colors.green;
+
+    if (holidayType.toLowerCase().contains('religious')) {
+      holidayIcon = Icons.church_outlined;
+      holidayColor = Colors.purple;
+    } else if (holidayType.toLowerCase().contains('national')) {
+      holidayIcon = Icons.flag_outlined;
+      holidayColor = Colors.red;
+    } else if (holidayType.toLowerCase().contains('public')) {
+      holidayIcon = Icons.beach_access_outlined;
+      holidayColor = Colors.blue;
+    }
+
+    return Container(
+      margin: EdgeInsets.symmetric(vertical: 8),
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [holidayColor.withOpacity(0.1), holidayColor.withOpacity(0.05)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: holidayColor.withOpacity(0.3), width: 2),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: holidayColor.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(holidayIcon, color: holidayColor, size: 24),
+                  ),
+                  SizedBox(width: 12),
+                  Text(
+                    holidayName,
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: holidayColor,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: holidayColor.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  holidayType,
+                  style: TextStyle(
+                    color: holidayColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 16),
+          Row(
+            children: [
+              Icon(Icons.info_outline_rounded, color: holidayColor, size: 20),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'No attendance required. Enjoy your holiday!',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: holidayColor.withOpacity(0.8),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 12),
+          Row(
+            children: [
+              Icon(Icons.access_time_rounded, color: holidayColor, size: 20),
+              SizedBox(width: 8),
+              Text(
+                'Work Hours: 0 hrs',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: holidayColor,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+// Regular Attendance Card Widget
+  Widget _buildAttendanceCard(Map<String, dynamic> attendance) {
+    final checkInRaw = attendance['checkInTimeFormatted'] ?? attendance['checkIn']?['time'];
+    final checkOutRaw = attendance['checkOutTimeFormatted'] ?? attendance['checkOut']?['time'];
+
+    final checkIn = _formatTime(checkInRaw);
+    final checkOut = _formatTime(checkOutRaw);
+    final workHours = attendance['workHours'] ?? 0;
+    final status = attendance['status'] ?? 'N/A';
+    final isLate = attendance['isLate'] == true;
+    final lateBy = attendance['lateBy'] ?? 0;
+    final isShortAttendance = attendance['isShortAttendance'] == true;
+    final shortByMinutes = attendance['shortByMinutes'] ?? 0;
+
+    // Determine status color
+    Color statusColor = Colors.indigo;
+    if (status == 'present') {
+      statusColor = Colors.green;
+    } else if (status == 'absent') {
+      statusColor = Colors.red;
+    } else if (status == 'halfday') {
+      statusColor = Colors.orange;
+    }
+
+    return Container(
+      margin: EdgeInsets.symmetric(vertical: 8),
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: statusColor.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: statusColor.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.verified_user, color: statusColor, size: 20),
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    status.toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: statusColor,
+                    ),
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  if (isLate)
+                    Container(
+                      margin: EdgeInsets.only(left: 6),
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'Late by $lateBy min',
+                        style: TextStyle(
+                          color: Colors.red.shade600,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  if (isShortAttendance)
+                    Container(
+                      margin: EdgeInsets.only(left: 6),
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'Short by $shortByMinutes min',
+                        style: TextStyle(
+                          color: Colors.orange.shade700,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+          SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _buildTimeTile(
+                icon: Icons.login_rounded,
+                label: "Check-In",
+                time: checkIn,
+                color: Colors.green,
+              ),
+              SizedBox(width: 10),
+              _buildTimeTile(
+                icon: Icons.logout_rounded,
+                label: "Check-Out",
+                time: checkOut,
+                color: Colors.red,
+              ),
+            ],
+          ),
+          SizedBox(height: 16),
+          Row(
+            children: [
+              Icon(Icons.access_time_rounded, color: Colors.amber[700], size: 20),
+              SizedBox(width: 8),
+              Text(
+                'Work Hours: ${workHours.toStringAsFixed(2)} hrs',
+                style: TextStyle(
+                  fontSize: 15,
+                  color: Colors.grey[800],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+// Helper method for time tiles (already exists)
   Widget _buildTimeTile({
     required IconData icon,
     required String label,
@@ -1059,41 +1207,98 @@ class _ReportScreenState extends State<ReportScreen> with TickerProviderStateMix
   }) {
     return Expanded(
       child: Container(
-        padding: EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+        padding: EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: color.withOpacity(0.1),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: color.withOpacity(0.3)),
         ),
-        child: Row(
+        child: Column(
           children: [
-            Icon(icon, color: color, size: 20),
-            SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                Icon(icon, color: color, size: 20),
+                SizedBox(width: 6),
                 Text(
                   label,
                   style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey[600],
-                  ),
-                ),
-                Text(
-                  time,
-                  style: TextStyle(
-                    fontSize: 15,
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: Colors.black87,
+                    color: color,
                   ),
                 ),
               ],
+            ),
+            SizedBox(height: 6),
+            Text(
+              time,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[800],
+              ),
             ),
           ],
         ),
       ),
     );
   }
+
+// Helper method to format time (already exists but moved outside)
+  String _formatTime(dynamic timeValue) {
+    if (timeValue == null || timeValue.toString().isEmpty) return "—";
+    try {
+      final dt = DateTime.parse(timeValue.toString()).toLocal();
+      return DateFormat('hh:mm a').format(dt);
+    } catch (_) {
+      return timeValue.toString();
+    }
+  }
+
+  // Widget _buildTimeTile({
+  //   required IconData icon,
+  //   required String label,
+  //   required String time,
+  //   required Color color,
+  // }) {
+  //   return Expanded(
+  //     child: Container(
+  //       padding: EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+  //       decoration: BoxDecoration(
+  //         color: Colors.white,
+  //         borderRadius: BorderRadius.circular(12),
+  //         border: Border.all(color: color.withOpacity(0.3)),
+  //       ),
+  //       child: Row(
+  //         children: [
+  //           Icon(icon, color: color, size: 20),
+  //           SizedBox(width: 8),
+  //           Column(
+  //             crossAxisAlignment: CrossAxisAlignment.start,
+  //             children: [
+  //               Text(
+  //                 label,
+  //                 style: TextStyle(
+  //                   fontSize: 13,
+  //                   color: Colors.grey[600],
+  //                 ),
+  //               ),
+  //               Text(
+  //                 time,
+  //                 style: TextStyle(
+  //                   fontSize: 15,
+  //                   fontWeight: FontWeight.w600,
+  //                   color: Colors.black87,
+  //                 ),
+  //               ),
+  //             ],
+  //           ),
+  //         ],
+  //       ),
+  //     ),
+  //   );
+  // }
 
   Widget _buildStatsOverview() {
     final stats = _attendanceData!['stats'] as Map<String, dynamic>? ?? {};

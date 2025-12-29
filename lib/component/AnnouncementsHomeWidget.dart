@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:staffsync/services/announcement_api.dart';
 import 'package:staffsync/models/announcement.dart';
-import '../screens/announcement.dart';
+import '../screens/announcement_screen.dart';
 
 class AnnouncementsHomeWidget extends StatefulWidget {
   final int maxItems;

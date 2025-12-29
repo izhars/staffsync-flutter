@@ -52,7 +52,13 @@ dependencies:
   google_maps_flutter: ^2.14.0
   webview_flutter: ^4.4.2
   shimmer: ^3.0.0
-
+  file_picker: ^8.0.0
+  path: ^1.9.0
+  http_parser: ^4.0.2  # or the latest version
+  firebase_core: ^2.27.0
+  firebase_messaging: ^14.7.10
+  flutter_local_notifications: ^17.0.0
+  
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -63,6 +69,9 @@ flutter:
   uses-material-design: true
   assets:
     - assets/location.png
+    - assets/no_internet.png
+    - assets/chat_pattern.png
+    - assets/staff_syncc.png
 
 flutter_icons:
   android: true

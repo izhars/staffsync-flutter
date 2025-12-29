@@ -39,6 +39,7 @@ class NetworkService {
   // ---------------------------------------------------------
   Future<Map<String, String>> _headers() async {
     final token = await _authService.getToken();
+
     return {
       HttpHeaders.contentTypeHeader: 'application/json',
       if (token != null && token.isNotEmpty)
@@ -110,6 +111,20 @@ class NetworkService {
       });
     });
   }
+
+  Future<dynamic> patch(String endpoint, Map<String, dynamic> body) async {
+    return retry(() async {
+      final headers = await _headers();
+      return _handleRequest(() {
+        return http.patch(
+          Uri.parse('$baseUrl$endpoint'),
+          headers: headers,
+          body: jsonEncode(body),
+        );
+      });
+    });
+  }
+
 
   Future<dynamic> post(String endpoint, Map<String, dynamic> body) async {
     return retry(() async {

@@ -3,11 +3,12 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:skeletonizer/skeletonizer.dart';
-import 'package:staffsync/screens/Sidebar.dart';
-import 'package:staffsync/screens/announcement.dart';
+import 'package:staffsync/app/sidebar.dart';
+import 'package:staffsync/screens/announcement_screen.dart';
 import 'package:staffsync/screens/combo_off_screen.dart';
+import 'package:staffsync/screens/notification_screen.dart';
 import 'package:staffsync/screens/payroll_screen.dart';
-import '../../app/AppScreen.dart';
+import '../../app/app_screen.dart';
 import '../../component/AnnouncementsHomeWidget.dart';
 import '../../component/AppInfo.dart';
 import '../../component/BouncyFeatureCard.dart';
@@ -23,11 +24,12 @@ import '../../services/auth_service.dart';
 import '../../services/avatar_api.dart';
 import '../../utils/device_info.dart';
 import '../../widgets/day_time_widget.dart';
-import '../FeedbackScreen.dart';
-import '../PollScreen.dart';
+import '../feedback_screen.dart';
+import '../poll_screen.dart';
 import '../SupportScreen.dart';
 import '../award_screen.dart';
 import '../celebration_screen.dart';
+import '../employee_tasks_screen.dart';
 import '../leave_screen.dart';
 import '../holiday_screen.dart';
 import '../report_screen.dart';
@@ -90,7 +92,6 @@ class _DashboardScreenState extends State<DashboardScreen>
   Future<void> _loadToken() async {
     final authService = AuthService();
     final fetchedToken = await authService.getToken(); // fetch token
-    // ✅ Print in console
     print('Fetched Token: $fetchedToken');
     setState(() {
       token = fetchedToken;
@@ -326,15 +327,17 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   final Map<AppScreen, Widget> _screenMap = {
     AppScreen.report: ReportScreen(),
-    AppScreen.tasks: AwardScreen(),
+    AppScreen.tasks: EmployeeTasksScreen(),
     AppScreen.leaves: LeavesScreen(),
-    AppScreen.payroll: PayrollScreen(),
+    AppScreen.payroll: PayrollListScreen(),
     AppScreen.holiday: PremiumHolidayCalendar(),
     AppScreen.polls: PollScreen(),
     AppScreen.support: SupportScreen(),
     AppScreen.announcement: AnnouncementsPage(),
     AppScreen.feedback: FeedbackScreen(),
     AppScreen.combooff: ComboOffScreen(),
+    AppScreen.award: AwardScreen(),
+    AppScreen.notification: NotificationScreen(),
   };
 
   String _getStatusTitle() {
@@ -662,8 +665,13 @@ class _DashboardScreenState extends State<DashboardScreen>
                   [Colors.pink.shade200, Colors.pink.shade100], Colors.pink.shade600, AppScreen.announcement),
               _buildFeatureCard("Feedback", Icons.feedback_rounded,
                   [Colors.amber.shade200, Colors.amber.shade100], Colors.amber.shade700, AppScreen.feedback),
-              _buildFeatureCard("Combooff", Icons.compare_arrows,
+              _buildFeatureCard("Combo Off", Icons.compare_arrows,
                   [Colors.grey.shade200, Colors.grey.shade100], Colors.grey.shade700, AppScreen.combooff),
+              _buildFeatureCard("Award", Icons.workspace_premium,
+                  [Colors.brown.shade200, Colors.brown.shade100], Colors.brown.shade700, AppScreen.award),
+              _buildFeatureCard("Notification", Icons.notifications_active,
+                  [Colors.cyan.shade200, Colors.cyan.shade100], Colors.cyan.shade700, AppScreen.notification,
+              ),
             ],
           );
         },

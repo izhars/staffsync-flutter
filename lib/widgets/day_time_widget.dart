@@ -7,23 +7,10 @@ import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import '../models/air_quality_data.dart';
+import '../models/quote.dart';
+import '../screens/QuotesListScreen.dart';
 import '../services/aqi_service.dart';
-
-// ===================== QUOTE MODEL =====================
-
-class Quote {
-  final String text;
-  final String author;
-
-  Quote({required this.text, required this.author});
-
-  factory Quote.fromJson(Map<String, dynamic> json) {
-    return Quote(
-      text: json['quote'] ?? '',
-      author: json['author'] ?? 'Unknown',
-    );
-  }
-}
+import '../services/quote_service.dart';
 
 // ===================== MAIN WIDGET =====================
 
@@ -173,29 +160,39 @@ class _DayTimeWidgetState extends State<DayTimeWidget>
 
 
   Future<void> _fetchQuote() async {
+    debugPrint("Fetching a random quote...");
+
+    setState(() {
+      _isLoadingQuote = true;
+    });
+
     try {
-      final response = await http.get(
-        Uri.parse('https://dummyjson.com/quotes/random'),
+      final quote = await QuoteService().fetchRandomQuote();
+
+      debugPrint(
+        "Quote fetched successfully: ${quote.text} — ${quote.author}",
       );
 
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = json.decode(response.body);
-        setState(() {
-          _currentQuote = Quote.fromJson(data);
-          _isLoadingQuote = false;
-        });
-      } else {
-        throw Exception('Failed to load quote');
-      }
-    } catch (e) {
+      setState(() {
+        _currentQuote = quote;
+      });
+    } catch (e, stackTrace) {
+      debugPrint('Error fetching quote: $e');
+      debugPrint('Stack trace: $stackTrace');
+
       setState(() {
         _currentQuote = Quote(
           text:
           "The best time to plant a tree was 20 years ago. The second best time is now.",
           author: "Chinese Proverb",
         );
+      });
+    } finally {
+      setState(() {
         _isLoadingQuote = false;
       });
+
+      debugPrint("Finished _fetchQuote()");
     }
   }
 
@@ -669,98 +666,114 @@ class _DigitalTimeDisplayState extends State<_DigitalTimeDisplay> {
 class _QuoteCard extends StatelessWidget {
   final Quote quote;
   final VoidCallback onRefresh;
+  final VoidCallback? onTap; // NEW: callback to open detail page
 
   const _QuoteCard({
     required this.quote,
     required this.onRefresh,
+    this.onTap, // optional – pass null if you don't want tap
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.3),
-          width: 1.5,
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const QuotesListScreen()), // or QuoteDetailScreen
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: Colors.white.withOpacity(0.3),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.format_quote_rounded,
-                  color: Colors.white,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  quote.text,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white.withOpacity(0.95),
-                    height: 1.5,
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  '— ${quote.author}',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white.withOpacity(0.85),
-                    letterSpacing: 0.3,
-                  ),
-                ),
-              ),
-              InkWell(
-                onTap: onRefresh,
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(
-                    Icons.refresh_rounded,
+                    Icons.format_quote_rounded,
                     color: Colors.white,
-                    size: 20,
+                    size: 24,
                   ),
                 ),
-              ),
-            ],
-          ),
-        ],
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    quote.text,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white.withOpacity(0.95),
+                      height: 1.5,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    '— ${quote.author}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white.withOpacity(0.85),
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ),
+                InkWell(
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => QuotesListScreen(),
+                      ),
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.refresh_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

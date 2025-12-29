@@ -34,27 +34,38 @@ class AuthService {
   }
 
   /// Login user
-  Future<User?> login(String email, String password) async {
-    print('📱 Starting login for email: $email');
-
+  // Update your AuthService login method
+  Future<User?> login(String email, String password, {String? fcmToken}) async {
     final deviceId = await _getDeviceId();
-    print('🔑 Device ID: $deviceId');
-
     final url = Uri.parse('${AppConstants.apiBaseUrl}/auth/login');
-    print('🌐 Login URL: $url');
+
+    final Map<String, dynamic> body = {
+      'email': email,
+      'password': password,
+      'deviceId': deviceId,
+    };
+
+    // Log FCM token before adding it
+    print('💡 FCM token before adding to body: $fcmToken');
+
+    // Add FCM token if available
+    if (fcmToken != null && fcmToken.isNotEmpty) {
+      body['fcmToken'] = fcmToken;
+      print('✅ FCM token added to request body');
+    } else {
+      print('⚠️ FCM token is null or empty');
+    }
+
+    print('📤 Request body: $body');
 
     final response = await http.post(
       url,
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'email': email,
-        'password': password,
-        'deviceId': deviceId,
-      }),
+      body: jsonEncode(body),
     );
 
-    print('📩 Response status: ${response.statusCode}');
-    print('📄 Response body: ${response.body}');
+    print('📥 Response status: ${response.statusCode}');
+    print('📥 Response body: ${response.body}');
 
     if (response.statusCode != 200) {
       throw Exception(
@@ -63,24 +74,64 @@ class AuthService {
     }
 
     final data = jsonDecode(response.body);
-    print('📝 Parsed JSON data: $data');
 
     if (data['success'] != true || data['user'] == null) {
       throw Exception(data['message'] ?? 'Login failed');
     }
 
     final token = data['token'];
-    print('🔐 Token received: $token');
-
     final user = User.fromJson(data['user']);
-    print('👤 User parsed: ${user.toJson()}');
-
     await _storeAuthData(token, user, data['user']);
-    print('💾 Auth data stored successfully');
+
+    // Store FCM token locally if provided
+    if (fcmToken != null && fcmToken.isNotEmpty) {
+      await _storeFcmToken(fcmToken);
+      print('💾 FCM token stored locally: $fcmToken');
+    }
 
     return user;
   }
 
+
+// Add method to store FCM token
+  Future<void> _storeFcmToken(String token) async {
+    final storage = const FlutterSecureStorage();
+    await storage.write(key: 'fcm_token', value: token);
+  }
+
+// Add method to get stored FCM token
+  Future<String?> getStoredFcmToken() async {
+    final storage = const FlutterSecureStorage();
+    return await storage.read(key: 'fcm_token');
+  }
+
+// Add method to update FCM token on server
+  Future<bool> updateFcmToken(String fcmToken) async {
+    try {
+      final url = Uri.parse('${AppConstants.apiBaseUrl}/auth/update-fcm-token');
+      final token = await getToken(); // Your method to get auth token
+
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'fcmToken': fcmToken,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        // Store locally
+        await _storeFcmToken(fcmToken);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
 
   /// Register new user
   Future<bool> register(String name, String email, String password) async {

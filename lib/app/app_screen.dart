@@ -9,6 +9,8 @@ enum AppScreen {
   support,
   announcement,
   feedback,
-  combooff
+  combooff,
+  award,
+  notification,
 }
 

@@ -77,19 +77,29 @@ class _AnnouncementsPageState extends State<AnnouncementsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        title: const Row(
-          children: [
-            Icon(Icons.campaign, size: 24),
-            SizedBox(width: 8),
-            Text("Announcements", style: TextStyle(fontWeight: FontWeight.w600)),
+        appBar: AppBar(
+          elevation: 0,
+          backgroundColor: Colors.pink.shade600,
+          foregroundColor: Colors.white,
+          title: Row(
+            children: [
+              const Text(
+                'Announcement',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(width: 8),
+            ],
+          ),
+          actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: Icon(
+                Icons.campaign, // combo off icon
+                color: Colors.white,
+              ),
+            ),
           ],
         ),
-        elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF1A202C),
-        surfaceTintColor: Colors.transparent,
-      ),
       body: FutureBuilder<List<Announcement>>(
         future: _futureAnnouncements,
         builder: (context, snapshot) {

@@ -50,24 +50,28 @@ class _BouncyFeatureCardState extends State<BouncyFeatureCard>
         curve: Curves.easeOutBack,
         child: Container(
           // Removed fixed width and height - let GridView handle sizing
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            gradient: LinearGradient(
-              colors: [
-                widget.gradientColors.first.withOpacity(0.85),
-                widget.gradientColors.last.withOpacity(0.85),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: widget.gradientColors.last.withOpacity(0.35),
-                blurRadius: 12,
-                offset: const Offset(0, 6),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: LinearGradient(
+                colors: [
+                  widget.gradientColors.first.withOpacity(0.85),
+                  widget.gradientColors.last.withOpacity(0.85),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
-            ],
-          ),
+              border: Border.all( // ✅ STROKE ADDED
+                color: Colors.white.withOpacity(0.25),
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: widget.gradientColors.last.withOpacity(0.35),
+                  blurRadius: 12,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(20),
             // Removed BackdropFilter for better performance

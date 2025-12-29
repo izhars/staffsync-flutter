@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 import '../services/PollService.dart';
-import 'PollResultsScreen.dart';
+import 'poll_results_screen.dart';
 
 class PollScreen extends StatefulWidget {
   const PollScreen({Key? key}) : super(key: key);
