@@ -1,26 +1,163 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:skeletonizer/skeletonizer.dart';
-import '../component/DailyReportWidget.dart';
-import '../component/MonthlyReportWidget.dart';
-import '../component/MonthlyWorkHoursBottomSheet.dart';
-import '../component/WeeklyReportWidget.dart';
+import '../component/daily_report_widget.dart';
+import '../component/monthly_report_widget.dart';
+import '../component/monthly_work_hours_bottom_sheet.dart';
+import '../component/weekly_report_widget.dart';
 import '../services/attendance_api.dart';
 
+// ===================== SHARED DESIGN TOKENS =====================
+class ReportDesign {
+  static const double xs = 4;
+  static const double sm = 8;
+  static const double md = 16;
+  static const double lg = 24;
+  static const double xl = 32;
+
+  static const double radiusSm = 10;
+  static const double radiusMd = 14;
+  static const double radiusLg = 20;
+  static const double radiusXl = 24;
+
+  // Primary indigo palette (matches original report theme, refined)
+  static const Color primary = Color(0xFF4F46E5); // indigo-600
+  static const Color primaryDark = Color(0xFF4338CA); // indigo-700
+  static const Color primarySoft = Color(0xFFEEF2FF); // indigo-50
+  static const Color primaryLight = Color(0xFFC7D2FE); // indigo-200
+
+  static const Color surface = Colors.white;
+  static const Color surfaceMuted = Color(0xFFF8FAFC);
+  static const Color bg = Color(0xFFF6F7FB);
+  static const Color border = Color(0xFFEAECEF);
+
+  static const Color textPrimary = Color(0xFF1A1D26);
+  static const Color textSecondary = Color(0xFF6B7280);
+  static const Color textMuted = Color(0xFF9CA3AF);
+
+  // Attendance semantic colors
+  static const Color present = Color(0xFF059669); // emerald
+  static const Color presentSoft = Color(0xFFECFDF5);
+  static const Color presentBorder = Color(0xFFA7F3D0);
+
+  static const Color late = Color(0xFFD97706); // amber
+  static const Color lateSoft = Color(0xFFFFFBEB);
+  static const Color lateBorder = Color(0xFFFDE68A);
+
+  static const Color short = Color(0xFFEA580C); // orange
+  static const Color shortSoft = Color(0xFFFFF7ED);
+  static const Color shortBorder = Color(0xFFFED7AA);
+
+  static const Color absent = Color(0xFFDC2626); // red
+  static const Color absentSoft = Color(0xFFFEF2F2);
+  static const Color absentBorder = Color(0xFFFECACA);
+
+  static const Color leave = Color(0xFF7C3AED); // violet
+  static const Color leaveSoft = Color(0xFFF5F3FF);
+  static const Color leaveBorder = Color(0xFFDDD6FE);
+
+  static const Color holiday = Color(0xFF2563EB); // blue
+  static const Color holidaySoft = Color(0xFFEFF6FF);
+  static const Color holidayBorder = Color(0xFFBFDBFE);
+
+  static const Color comboOff = Color(0xFF0D9488); // teal
+  static const Color comboOffSoft = Color(0xFFF0FDFA);
+  static const Color comboOffBorder = Color(0xFF99F6E4);
+
+  static const Color neutral = Color(0xFF6B7280);
+  static const Color neutralSoft = Color(0xFFF3F4F6);
+  static const Color neutralBorder = Color(0xFFE5E7EB);
+
+  static List<BoxShadow> get softShadow => [
+    BoxShadow(
+      color: Colors.black.withOpacity(0.04),
+      blurRadius: 14,
+      offset: const Offset(0, 4),
+      spreadRadius: -2,
+    ),
+  ];
+
+  static List<BoxShadow> get cardShadow => [
+    BoxShadow(
+      color: Colors.black.withOpacity(0.06),
+      blurRadius: 22,
+      offset: const Offset(0, 8),
+      spreadRadius: -6,
+    ),
+  ];
+
+  // ===================== STATUS → COLOR =====================
+
+  static (Color, Color, Color) statusStyle(
+      String status, {
+        bool? isLate,
+        bool? isShortAttendance,
+      }) {
+    if (isShortAttendance == true) {
+      return (short, shortSoft, shortBorder);
+    }
+    if (isLate == true) {
+      return (late, lateSoft, lateBorder);
+    }
+
+    switch (status.toLowerCase()) {
+      case 'present':
+        return (present, presentSoft, presentBorder);
+      case 'absent':
+        return (absent, absentSoft, absentBorder);
+      case 'half-day':
+      case 'halfday':
+        return (short, shortSoft, shortBorder);
+      case 'on-leave':
+        return (leave, leaveSoft, leaveBorder);
+      case 'public-holiday':
+      case 'holiday':
+        return (holiday, holidaySoft, holidayBorder);
+      case 'combo-off':
+        return (comboOff, comboOffSoft, comboOffBorder);
+      case 'weekly-off':
+      case 'weeklyoff':
+        return (leave, leaveSoft, leaveBorder);
+      case 'non-working-day':
+      default:
+        return (neutral, neutralSoft, neutralBorder);
+    }
+  }
+
+  static Color statusMarkerColor(
+      String status, {
+        bool? isLate,
+        bool? isShortAttendance,
+      }) {
+    return statusStyle(status,
+        isLate: isLate, isShortAttendance: isShortAttendance)
+        .$1;
+  }
+}
+
 class ReportScreen extends StatefulWidget {
+  const ReportScreen({Key? key}) : super(key: key);
+
   @override
   _ReportScreenState createState() => _ReportScreenState();
 }
 
-class _ReportScreenState extends State<ReportScreen> with TickerProviderStateMixin {
+class _ReportScreenState extends State<ReportScreen>
+    with TickerProviderStateMixin {
   int _selectedIndex = 0;
   late TabController _tabController;
-  final List<String> _tabs = ['Calendar', 'Daily', 'Weekly', 'Monthly'];
+  final List<Map<String, dynamic>> _tabs = [
+    {'label': 'Calendar', 'icon': Icons.calendar_month_outlined},
+    {'label': 'Daily', 'icon': Icons.today_outlined},
+    {'label': 'Weekly', 'icon': Icons.date_range_outlined},
+    {'label': 'Monthly', 'icon': Icons.calendar_view_month_outlined},
+  ];
+
   Map<String, dynamic>? _attendanceData;
   bool _isLoading = true;
 
-  // Calendar specific variables
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
   Map<DateTime, List<dynamic>> _attendanceEvents = {};
@@ -34,11 +171,8 @@ class _ReportScreenState extends State<ReportScreen> with TickerProviderStateMix
     _selectedDay = DateTime.now();
     _tabController = TabController(length: _tabs.length, vsync: this);
     _tabController.addListener(() {
-      if (_tabController.indexIsChanging) {
-        setState(() {
-          _selectedIndex = _tabController.index;
-        });
-      }
+      if (_tabController.indexIsChanging) return;
+      setState(() => _selectedIndex = _tabController.index);
     });
     _loadAttendance();
   }
@@ -56,12 +190,14 @@ class _ReportScreenState extends State<ReportScreen> with TickerProviderStateMix
         month: month ?? _focusedDay.month,
         year: year ?? _focusedDay.year,
       );
+      if (!mounted) return;
       setState(() {
         _attendanceData = data;
         _isLoading = false;
         _processAttendanceEvents();
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _attendanceData = null;
         _isLoading = false;
@@ -71,7 +207,9 @@ class _ReportScreenState extends State<ReportScreen> with TickerProviderStateMix
   }
 
   void _processAttendanceEvents() {
-    if (_attendanceData == null || _attendanceData!['attendance'] == null) return;
+    if (_attendanceData == null || _attendanceData!['attendance'] == null) {
+      return;
+    }
 
     _attendanceEvents.clear();
     final attendanceList = _attendanceData!['attendance'] as List<dynamic>;
@@ -96,716 +234,651 @@ class _ReportScreenState extends State<ReportScreen> with TickerProviderStateMix
     return _attendanceEvents[normalizedDay] ?? [];
   }
 
-  Color _getStatusColor(String status, {bool? isLate, bool? isShortAttendance}) {
+  // ===================== CALENDAR DAY CELL =====================
+
+  /// Builds a fully-filled calendar day cell colored by attendance status.
+  Widget _buildDayCell(
+      DateTime day, {
+        required bool isToday,
+        required bool isSelected,
+      }) {
+    final events = _getEventsForDay(day);
+
+    // Day with no attendance record
+    if (events.isEmpty) {
+      final isWeekend = day.weekday == DateTime.saturday ||
+          day.weekday == DateTime.sunday;
+
+      return Container(
+        margin: const EdgeInsets.all(4),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: isSelected
+              ? ReportDesign.primary
+              : isToday
+              ? ReportDesign.primaryLight
+              : null,
+          shape: BoxShape.circle,
+        ),
+        child: Text(
+          '${day.day}',
+          style: TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            color: isSelected
+                ? Colors.white
+                : isToday
+                ? ReportDesign.primaryDark
+                : isWeekend
+                ? ReportDesign.absent.withOpacity(0.7)
+                : ReportDesign.textPrimary,
+          ),
+        ),
+      );
+    }
+
+    final event = events.first;
+    final (color, _, _) = _statusStyle(
+      event['status']?.toString() ?? '',
+      isLate: event['isLate'] == true,
+      isShortAttendance: event['isShortAttendance'] == true,
+    );
+
+    return Container(
+      margin: const EdgeInsets.all(3),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        // Selected = solid status color, otherwise a visible tinted fill
+        color: isSelected ? color : color.withOpacity(0.18),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isToday
+              ? ReportDesign.textPrimary
+              : (isSelected ? color : color.withOpacity(0.55)),
+          width: isToday ? 2 : 1.2,
+        ),
+        boxShadow: isSelected
+            ? [
+          BoxShadow(
+            color: color.withOpacity(0.4),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+            spreadRadius: -2,
+          ),
+        ]
+            : null,
+      ),
+      child: Text(
+        '${day.day}',
+        style: TextStyle(
+          fontSize: 13.5,
+          fontWeight: FontWeight.w800,
+          color: isSelected ? Colors.white : color,
+        ),
+      ),
+    );
+  }
+
+  // ===================== STATUS → COLOR =====================
+
+  (Color, Color, Color) _statusStyle(
+      String status, {
+        bool? isLate,
+        bool? isShortAttendance,
+      }) {
     if (isShortAttendance == true) {
-      return Colors.deepOrange;
+      return (
+      ReportDesign.short,
+      ReportDesign.shortSoft,
+      ReportDesign.shortBorder
+      );
     }
     if (isLate == true) {
-      return Colors.amber[700]!;
+      return (
+      ReportDesign.late,
+      ReportDesign.lateSoft,
+      ReportDesign.lateBorder
+      );
     }
 
     switch (status.toLowerCase()) {
       case 'present':
-        return Colors.green;
+        return (
+        ReportDesign.present,
+        ReportDesign.presentSoft,
+        ReportDesign.presentBorder
+        );
       case 'absent':
-        return Colors.red;
+        return (
+        ReportDesign.absent,
+        ReportDesign.absentSoft,
+        ReportDesign.absentBorder
+        );
       case 'half-day':
-        return Colors.orange;
+      case 'halfday':
+        return (
+        ReportDesign.short,
+        ReportDesign.shortSoft,
+        ReportDesign.shortBorder
+        );
       case 'on-leave':
-        return Colors.purple;
+        return (
+        ReportDesign.leave,
+        ReportDesign.leaveSoft,
+        ReportDesign.leaveBorder
+        );
       case 'public-holiday':
-        return Colors.blue;
+      case 'holiday':
+        return (
+        ReportDesign.holiday,
+        ReportDesign.holidaySoft,
+        ReportDesign.holidayBorder
+        );
       case 'combo-off':
-        return Colors.teal;
+        return (
+        ReportDesign.comboOff,
+        ReportDesign.comboOffSoft,
+        ReportDesign.comboOffBorder
+        );
+      case 'weekly-off':
+      case 'weeklyoff':
+        return (
+        ReportDesign.leave,
+        ReportDesign.leaveSoft,
+        ReportDesign.leaveBorder
+        );
       case 'non-working-day':
-        return Colors.grey;
       default:
-        return Colors.grey;
+        return (
+        ReportDesign.neutral,
+        ReportDesign.neutralSoft,
+        ReportDesign.neutralBorder
+        );
     }
   }
 
+  Color _statusMarkerColor(
+      String status, {
+        bool? isLate,
+        bool? isShortAttendance,
+      }) {
+    return _statusStyle(status,
+        isLate: isLate, isShortAttendance: isShortAttendance)
+        .$1;
+  }
+
+  // ===================== BUILD =====================
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        title: Text('Attendance Reports',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
-        backgroundColor: Colors.indigo[600],
-        foregroundColor: Colors.white,
-        elevation: 0,
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Colors.indigo[600]!, Colors.indigo[400]!],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-        ),
-        bottom: PreferredSize(
-          preferredSize: Size.fromHeight(60),
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Colors.indigo[600]!, Colors.indigo[400]!],
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        backgroundColor: ReportDesign.bg,
+        body: Column(
+          children: [
+            _buildHeader(),
+            Expanded(
+              child: _isLoading
+                  ? _buildSkeletonLoading()
+                  : (_attendanceData == null ||
+                  _attendanceData!['success'] != true)
+                  ? _buildErrorWidget()
+                  : TabBarView(
+                controller: _tabController,
+                physics: const BouncingScrollPhysics(),
+                children: [
+                  _buildCalendarView(),
+                  DailyReportWidget(
+                    attendanceList: _attendanceData!['attendance']
+                    as List<dynamic>? ??
+                        [],
+                    onRefresh: _loadAttendance,
+                  ),
+                  WeeklyReportWidget(
+                    attendanceList: _attendanceData!['attendance']
+                    as List<dynamic>? ??
+                        [],
+                    onRefresh: _loadAttendance,
+                  ),
+                  MonthlyReportWidget(
+                    attendanceList: _attendanceData!['attendance']
+                    as List<dynamic>? ??
+                        [],
+                    onRefresh: _loadAttendance,
+                  ),
+                ],
               ),
             ),
-            child: TabBar(
-              controller: _tabController,
-              labelColor: Colors.white,
-              unselectedLabelColor: Colors.white70,
-              indicatorColor: Colors.white,
-              indicatorWeight: 3,
-              indicatorSize: TabBarIndicatorSize.tab,
-              labelStyle: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-              tabs: _tabs.map((tab) => Tab(
-                child: Container(
-                  padding: EdgeInsets.symmetric(vertical: 8),
-                  child: Text(tab),
-                ),
-              )).toList(),
-            ),
-          ),
+          ],
         ),
-      ),
-      body: _isLoading
-          ? _buildSkeletonLoading()
-          : _attendanceData == null || _attendanceData!['success'] != true
-          ? _buildErrorWidget()
-          : TabBarView(
-        controller: _tabController,
-        children: [
-          _buildCalendarView(),
-          DailyReportWidget(
-            attendanceList: _attendanceData!['attendance'] as List<dynamic>? ?? [],
-            onRefresh: _loadAttendance,
-          ),
-          WeeklyReportWidget(
-            attendanceList: _attendanceData!['attendance'] as List<dynamic>? ?? [],
-            onRefresh: _loadAttendance,
-          ),
-          MonthlyReportWidget(
-            attendanceList: _attendanceData!['attendance'] as List<dynamic>? ?? [],
-            onRefresh: _loadAttendance,
-          ),
-        ],
       ),
     );
   }
+
+  // ===================== HEADER =====================
+
+  Widget _buildHeader() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [ReportDesign.primary, ReportDesign.primaryDark],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: const BorderRadius.vertical(
+          bottom: Radius.circular(ReportDesign.radiusXl),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: ReportDesign.primary.withOpacity(0.25),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+            spreadRadius: -6,
+          ),
+        ],
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            ReportDesign.md,
+            ReportDesign.sm,
+            ReportDesign.md,
+            ReportDesign.md,
+          ),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  // Back button
+                  Material(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius:
+                    BorderRadius.circular(ReportDesign.radiusSm),
+                    child: InkWell(
+                      borderRadius:
+                      BorderRadius.circular(ReportDesign.radiusSm),
+                      onTap: () => Navigator.pop(context),
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        alignment: Alignment.center,
+                        child: const Icon(
+                          Icons.arrow_back_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: ReportDesign.sm + 4),
+
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Attendance Reports',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                            letterSpacing: -0.4,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Track your work history',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: Colors.white70,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Refresh button
+                  Material(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius:
+                    BorderRadius.circular(ReportDesign.radiusSm),
+                    child: InkWell(
+                      borderRadius:
+                      BorderRadius.circular(ReportDesign.radiusSm),
+                      onTap: () => _loadAttendance(),
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        alignment: Alignment.center,
+                        child: const Icon(
+                          Icons.refresh_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: ReportDesign.md),
+
+              // Segmented tab bar
+              Container(
+                height: 48,
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.15),
+                  borderRadius:
+                  BorderRadius.circular(ReportDesign.radiusMd),
+                ),
+                child: TabBar(
+                  controller: _tabController,
+                  dividerColor: Colors.transparent,
+                  indicator: BoxDecoration(
+                    color: ReportDesign.surface,
+                    borderRadius:
+                    BorderRadius.circular(ReportDesign.radiusSm),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.08),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  indicatorSize: TabBarIndicatorSize.tab,
+                  indicatorPadding: EdgeInsets.zero,
+                  labelColor: ReportDesign.primary,
+                  unselectedLabelColor: Colors.white.withOpacity(0.85),
+                  labelPadding: EdgeInsets.zero,
+                  splashFactory: NoSplash.splashFactory,
+                  overlayColor:
+                  MaterialStateProperty.all(Colors.transparent),
+                  labelStyle: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    letterSpacing: -0.1,
+                  ),
+                  unselectedLabelStyle: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                    letterSpacing: -0.1,
+                  ),
+                  tabs: _tabs.map((tab) {
+                    return Tab(
+                      height: 40,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(tab['icon'] as IconData, size: 15),
+                          const SizedBox(width: 5),
+                          Flexible(
+                            child: Text(
+                              tab['label'] as String,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===================== ERROR =====================
+
+  Widget _buildErrorWidget() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(ReportDesign.xl),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 104,
+              height: 104,
+              decoration: const BoxDecoration(
+                color: ReportDesign.absentSoft,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.cloud_off_rounded,
+                size: 46,
+                color: ReportDesign.absent,
+              ),
+            ),
+            const SizedBox(height: ReportDesign.lg),
+            const Text(
+              'Failed to load reports',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                color: ReportDesign.textPrimary,
+                letterSpacing: -0.3,
+              ),
+            ),
+            const SizedBox(height: ReportDesign.sm),
+            const Text(
+              'Please check your connection and try again',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                color: ReportDesign.textMuted,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: ReportDesign.lg),
+            ElevatedButton.icon(
+              onPressed: () => _loadAttendance(),
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('Try Again'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ReportDesign.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: ReportDesign.lg,
+                  vertical: ReportDesign.sm + 4,
+                ),
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius:
+                  BorderRadius.circular(ReportDesign.radiusSm),
+                ),
+                textStyle: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13.5,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ===================== SKELETON =====================
 
   Widget _buildSkeletonLoading() {
     return Skeletonizer(
       enabled: true,
-      child: SingleChildScrollView( // Wrap with SingleChildScrollView
-        physics: AlwaysScrollableScrollPhysics(),
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(ReportDesign.md),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Skeleton for the legend section
-            Container(
-              margin: EdgeInsets.all(16),
-              padding: EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.white, Colors.indigo[50]!],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.indigo.withOpacity(0.1),
-                    spreadRadius: 2,
-                    blurRadius: 12,
-                    offset: Offset(0, 4),
-                  ),
-                ],
-              ),
+            _skeletonCard(
+              height: 140,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
-                    children: [
-                      Icon(Icons.info_outline, color: Colors.indigo[600], size: 20),
+                    children: const [
+                      Icon(Icons.info_outline, size: 18),
                       SizedBox(width: 8),
-                      Text(
-                        'Status Legend',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.indigo[600],
-                        ),
-                      ),
+                      Text('Status Legend',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 15)),
                     ],
                   ),
-                  SizedBox(height: 12),
+                  const SizedBox(height: ReportDesign.md),
                   Wrap(
-                    spacing: 12,
-                    runSpacing: 10,
-                    children: [
-                      _buildSkeletonLegendItem('Present'),
-                      _buildSkeletonLegendItem('Late'),
-                      _buildSkeletonLegendItem('Short'),
-                      _buildSkeletonLegendItem('Absent'),
-                      _buildSkeletonLegendItem('Half Day'),
-                      _buildSkeletonLegendItem('On Leave'),
-                      _buildSkeletonLegendItem('Holiday'),
-                      _buildSkeletonLegendItem('Comp Off'),
-                    ],
+                    spacing: ReportDesign.sm,
+                    runSpacing: ReportDesign.sm,
+                    children: List.generate(
+                      6,
+                          (i) => Container(
+                        width: 80,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: ReportDesign.surfaceMuted,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
-
-            // Skeleton for calendar
-            Container(
-              margin: EdgeInsets.symmetric(horizontal: 16),
-              padding: EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
-                    spreadRadius: 1,
-                    blurRadius: 10,
-                    offset: Offset(0, 4),
-                  ),
-                ],
-              ),
+            const SizedBox(height: ReportDesign.md),
+            _skeletonCard(
+              height: 340,
               child: Column(
                 children: [
-                  // Calendar header skeleton
-                  Container(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Container(
-                          width: 100,
-                          height: 20,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[300],
-                            borderRadius: BorderRadius.circular(4),
-                          ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        width: 100,
+                        height: 18,
+                        decoration: BoxDecoration(
+                          color: ReportDesign.surfaceMuted,
+                          borderRadius: BorderRadius.circular(4),
                         ),
-                        Container(
-                          width: 80,
-                          height: 30,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[300],
-                            borderRadius: BorderRadius.circular(8),
-                          ),
+                      ),
+                      Container(
+                        width: 80,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: ReportDesign.surfaceMuted,
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-
-                  // Calendar grid skeleton - Reduced height
-                  Container(
-                    height: 280, // Fixed height to prevent overflow
+                  const SizedBox(height: ReportDesign.md),
+                  SizedBox(
+                    height: 250,
                     child: GridView.builder(
                       shrinkWrap: true,
-                      physics: NeverScrollableScrollPhysics(),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate:
+                      const SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 7,
-                        crossAxisSpacing: 4, // Reduced spacing
-                        mainAxisSpacing: 4, // Reduced spacing
+                        crossAxisSpacing: 4,
+                        mainAxisSpacing: 4,
                       ),
-                      itemCount: 42, // 6 weeks
-                      itemBuilder: (context, index) {
-                        return Container(
-                          height: 30, // Reduced height
-                          decoration: BoxDecoration(
-                            color: Colors.grey[200],
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                        );
-                      },
+                      itemCount: 42,
+                      itemBuilder: (_, __) => Container(
+                        decoration: BoxDecoration(
+                          color: ReportDesign.surfaceMuted,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
-
-            // Skeleton for selected day events - Made more compact
-            Container(
-              margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              padding: EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
-                    spreadRadius: 1,
-                    blurRadius: 10,
-                    offset: Offset(0, 4),
-                  ),
-                ],
-              ),
+            const SizedBox(height: ReportDesign.md),
+            _skeletonCard(
+              height: 200,
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 200,
-                    height: 16, // Reduced height
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                  SizedBox(height: 12), // Reduced spacing
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Container(
-                          height: 50, // Reduced height
-                          decoration: BoxDecoration(
-                            color: Colors.grey[200],
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                      ),
-                      SizedBox(width: 8), // Reduced spacing
-                      Expanded(
-                        child: Container(
-                          height: 50, // Reduced height
-                          decoration: BoxDecoration(
-                            color: Colors.grey[200],
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            // Skeleton for stats overview - Made more compact
-            Container(
-              margin: EdgeInsets.all(16),
-              padding: EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
-                    spreadRadius: 1,
-                    blurRadius: 10,
-                    offset: Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
                     width: 180,
-                    height: 16, // Reduced height
+                    height: 16,
                     decoration: BoxDecoration(
-                      color: Colors.grey[300],
+                      color: ReportDesign.surfaceMuted,
                       borderRadius: BorderRadius.circular(4),
                     ),
                   ),
-                  SizedBox(height: 12), // Reduced spacing
+                  const SizedBox(height: ReportDesign.md),
                   GridView.builder(
                     shrinkWrap: true,
-                    physics: NeverScrollableScrollPhysics(),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate:
+                    const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
-                      childAspectRatio: 1.3, // Reduced aspect ratio
-                      crossAxisSpacing: 8, // Reduced spacing
-                      mainAxisSpacing: 8, // Reduced spacing
+                      childAspectRatio: 1.4,
+                      crossAxisSpacing: ReportDesign.sm,
+                      mainAxisSpacing: ReportDesign.sm,
                     ),
-                    itemCount: 6, // Reduced from 8 to 6 items
-                    itemBuilder: (context, index) {
-                      return Container(
-                        decoration: BoxDecoration(
-                          color: Colors.grey[200],
-                          borderRadius: BorderRadius.circular(8), // Reduced radius
-                        ),
-                        child: Padding(
-                          padding: EdgeInsets.all(8), // Reduced padding
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Container(
-                                width: 24, // Reduced size
-                                height: 24, // Reduced size
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[300],
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              SizedBox(height: 6), // Reduced spacing
-                              Container(
-                                width: 30, // Reduced width
-                                height: 12, // Reduced height
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[300],
-                                  borderRadius: BorderRadius.circular(3),
-                                ),
-                              ),
-                              SizedBox(height: 4), // Reduced spacing
-                              Container(
-                                width: 50, // Reduced width
-                                height: 10, // Reduced height
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[300],
-                                  borderRadius: BorderRadius.circular(3),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
+                    itemCount: 6,
+                    itemBuilder: (_, __) => Container(
+                      decoration: BoxDecoration(
+                        color: ReportDesign.surfaceMuted,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
-
-            // Add some bottom padding to ensure everything fits
-            SizedBox(height: 20),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSkeletonLegendItem(String label) {
+  Widget _skeletonCard({required double height, required Widget child}) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      constraints: BoxConstraints(minHeight: height),
+      padding: const EdgeInsets.all(ReportDesign.md),
       decoration: BoxDecoration(
-        color: Colors.grey[200],
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey[300]!, width: 1),
+        color: ReportDesign.surface,
+        borderRadius: BorderRadius.circular(ReportDesign.radiusLg),
+        border: Border.all(color: ReportDesign.border, width: 1),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 10,
-            height: 10,
-            decoration: BoxDecoration(
-              color: Colors.grey[300],
-              shape: BoxShape.circle,
-            ),
-          ),
-          SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
+      child: child,
     );
   }
 
-  Widget _buildErrorWidget() {
-    return Center(
-      child: Container(
-        margin: EdgeInsets.all(24),
-        padding: EdgeInsets.all(32),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              spreadRadius: 1,
-              blurRadius: 10,
-              offset: Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
-            SizedBox(height: 24),
-            Text(
-              'Failed to load attendance data',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey[800],
-              ),
-            ),
-            SizedBox(height: 12),
-            Text(
-              'Please check your connection and try again',
-              style: TextStyle(color: Colors.grey[600]),
-              textAlign: TextAlign.center,
-            ),
-            SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: () => _loadAttendance(),
-              icon: Icon(Icons.refresh),
-              label: Text('Retry'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.indigo[600],
-                foregroundColor: Colors.white,
-                padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  // ===================== CALENDAR VIEW =====================
 
   Widget _buildCalendarView() {
     return RefreshIndicator(
       onRefresh: () => _loadAttendance(),
-      color: Colors.indigo[600],
+      color: ReportDesign.primary,
+      backgroundColor: ReportDesign.surface,
       child: SingleChildScrollView(
-        physics: AlwaysScrollableScrollPhysics(),
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(
+          ReportDesign.md,
+          ReportDesign.md,
+          ReportDesign.md,
+          ReportDesign.xl,
+        ),
         child: Column(
           children: [
-            // Status Legend
-            Container(
-              margin: EdgeInsets.all(16),
-              padding: EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.white, Colors.indigo[50]!],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.indigo.withOpacity(0.1),
-                    spreadRadius: 2,
-                    blurRadius: 12,
-                    offset: Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.info_outline, color: Colors.indigo[600], size: 20),
-                      SizedBox(width: 8),
-                      Text(
-                        'Status Legend',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.indigo[600],
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 12),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 10,
-                    children: [
-                      _buildLegendItem('Present', Colors.green),
-                      _buildLegendItem('Late', Colors.amber[700]!),
-                      _buildLegendItem('Short', Colors.deepOrange),
-                      _buildLegendItem('Absent', Colors.red),
-                      _buildLegendItem('Half Day', Colors.orange),
-                      _buildLegendItem('On Leave', Colors.purple),
-                      _buildLegendItem('Holiday', Colors.blue),
-                      _buildLegendItem('Comp Off', Colors.teal),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            // Calendar Widget
-            Container(
-              margin: EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
-                    spreadRadius: 1,
-                    blurRadius: 10,
-                    offset: Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: TableCalendar<dynamic>(
-                  firstDay: DateTime.utc(2020, 1, 1),
-                  lastDay: DateTime.utc(2030, 12, 31),
-                  focusedDay: _focusedDay,
-                  calendarFormat: _calendarFormat,
-                  eventLoader: _getEventsForDay,
-                  startingDayOfWeek: StartingDayOfWeek.monday,
-                  selectedDayPredicate: (day) {
-                    return isSameDay(_selectedDay, day);
-                  },
-                  onDaySelected: (selectedDay, focusedDay) {
-                    if (!isSameDay(_selectedDay, selectedDay)) {
-                      setState(() {
-                        _selectedDay = selectedDay;
-                        _focusedDay = focusedDay;
-                      });
-                    }
-                  },
-                  onFormatChanged: (format) {
-                    if (_calendarFormat != format) {
-                      setState(() {
-                        _calendarFormat = format;
-                      });
-                    }
-                  },
-                  onPageChanged: (focusedDay) {
-                    setState(() {
-                      _focusedDay = focusedDay;
-                    });
-                    _loadAttendance(month: focusedDay.month, year: focusedDay.year);
-                  },
-                  calendarStyle: CalendarStyle(
-                    outsideDaysVisible: false,
-                    weekendTextStyle: TextStyle(color: Colors.red[400], fontWeight: FontWeight.w600),
-                    holidayTextStyle: TextStyle(color: Colors.red[400]),
-                    selectedDecoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Colors.indigo[600]!, Colors.indigo[400]!],
-                      ),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.indigo.withOpacity(0.4),
-                          blurRadius: 8,
-                          offset: Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    todayDecoration: BoxDecoration(
-                      color: Colors.indigo[300],
-                      shape: BoxShape.circle,
-                    ),
-                    markersMaxCount: 1,
-                    markerSize: 8.0,
-                    markersOffset: PositionedOffset(bottom: 4, start: 0),
-                    defaultTextStyle: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-                    cellMargin: EdgeInsets.all(6),
-                    cellPadding: EdgeInsets.all(0),
-                  ),
-                  calendarBuilders: CalendarBuilders(
-                    markerBuilder: (context, day, events) {
-                      if (events.isNotEmpty) {
-                        final event = events.first;
-                        final status = event['status']?.toString() ?? '';
-                        final isLate = event['isLate'] == true;
-                        final isShortAttendance = event['isShortAttendance'] == true;
-
-                        return Positioned(
-                          bottom: 2,
-                          child: Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: _getStatusColor(status, isLate: isLate, isShortAttendance: isShortAttendance),
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 1.5),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.2),
-                                  blurRadius: 2,
-                                  offset: Offset(0, 1),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      }
-                      return null;
-                    },
-                    defaultBuilder: (context, day, focusedDay) {
-                      final events = _getEventsForDay(day);
-                      if (events.isNotEmpty) {
-                        return Container(
-                          margin: EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.indigo[100]!, width: 1.5),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            '${day.day}',
-                            style: TextStyle(
-                              color: Colors.black87,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        );
-                      }
-                      return null;
-                    },
-                  ),
-                  headerStyle: HeaderStyle(
-                    formatButtonVisible: true,
-                    titleCentered: true,
-                    formatButtonShowsNext: false,
-                    formatButtonDecoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Colors.indigo[100]!, Colors.indigo[200]!],
-                      ),
-                      borderRadius: BorderRadius.circular(10.0),
-                    ),
-                    formatButtonTextStyle: TextStyle(
-                      color: Colors.indigo[700],
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    ),
-                    titleTextStyle: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.indigo[700],
-                    ),
-                    leftChevronIcon: Icon(
-                      Icons.chevron_left_rounded,
-                      color: Colors.indigo[600],
-                      size: 28,
-                    ),
-                    rightChevronIcon: Icon(
-                      Icons.chevron_right_rounded,
-                      color: Colors.indigo[600],
-                      size: 28,
-                    ),
-                    headerPadding: EdgeInsets.symmetric(vertical: 12),
-                  ),
-                  daysOfWeekStyle: DaysOfWeekStyle(
-                    weekdayStyle: TextStyle(
-                      color: Colors.grey[700],
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    ),
-                    weekendStyle: TextStyle(
-                      color: Colors.red[400],
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-            if (_selectedDay != null) _buildSelectedDayEvents(),
+            _buildLegendCard(),
+            const SizedBox(height: ReportDesign.md),
+            _buildCalendarCard(),
+            if (_selectedDay != null) ...[
+              const SizedBox(height: ReportDesign.md),
+              _buildSelectedDayEvents(),
+            ],
+            const SizedBox(height: ReportDesign.md),
             _buildStatsOverview(),
           ],
         ),
@@ -813,39 +886,117 @@ class _ReportScreenState extends State<ReportScreen> with TickerProviderStateMix
     );
   }
 
-  Widget _buildLegendItem(String label, Color color) {
+  // ===================== LEGEND =====================
+
+  Widget _buildLegendCard() {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.all(ReportDesign.md),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: ReportDesign.surface,
+        borderRadius: BorderRadius.circular(ReportDesign.radiusLg),
+        border: Border.all(color: ReportDesign.border, width: 1),
+        boxShadow: ReportDesign.softShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: ReportDesign.primarySoft,
+                  borderRadius:
+                  BorderRadius.circular(ReportDesign.radiusSm - 2),
+                  border: Border.all(
+                    color: ReportDesign.primaryLight,
+                    width: 1,
+                  ),
+                ),
+                child: const Icon(
+                  Icons.info_outline_rounded,
+                  color: ReportDesign.primary,
+                  size: 16,
+                ),
+              ),
+              const SizedBox(width: ReportDesign.sm + 2),
+              const Text(
+                'Status Legend',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: ReportDesign.textPrimary,
+                  letterSpacing: -0.2,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: ReportDesign.md),
+          Wrap(
+            spacing: ReportDesign.sm,
+            runSpacing: ReportDesign.sm,
+            children: [
+              _legendItem('Present', ReportDesign.present,
+                  ReportDesign.presentSoft, ReportDesign.presentBorder),
+              _legendItem('Late', ReportDesign.late, ReportDesign.lateSoft,
+                  ReportDesign.lateBorder),
+              _legendItem('Short', ReportDesign.short, ReportDesign.shortSoft,
+                  ReportDesign.shortBorder),
+              _legendItem('Absent', ReportDesign.absent,
+                  ReportDesign.absentSoft, ReportDesign.absentBorder),
+              _legendItem('Half Day', ReportDesign.short,
+                  ReportDesign.shortSoft, ReportDesign.shortBorder),
+              _legendItem('On Leave', ReportDesign.leave,
+                  ReportDesign.leaveSoft, ReportDesign.leaveBorder),
+              _legendItem('Holiday', ReportDesign.holiday,
+                  ReportDesign.holidaySoft, ReportDesign.holidayBorder),
+              _legendItem('Comp Off', ReportDesign.comboOff,
+                  ReportDesign.comboOffSoft, ReportDesign.comboOffBorder),
+              _legendItem('Weekly Off', ReportDesign.leave,
+                  ReportDesign.leaveSoft, ReportDesign.leaveBorder),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _legendItem(
+      String label,
+      Color color,
+      Color bg,
+      Color border,
+      ) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: ReportDesign.sm + 2,
+        vertical: ReportDesign.xs + 2,
+      ),
+      decoration: BoxDecoration(
+        color: bg,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3), width: 1),
+        border: Border.all(color: border, width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 10,
-            height: 10,
+            width: 8,
+            height: 8,
             decoration: BoxDecoration(
               color: color,
               shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: color.withOpacity(0.3),
-                  blurRadius: 4,
-                  offset: Offset(0, 2),
-                ),
-              ],
             ),
           ),
-          SizedBox(width: 6),
+          const SizedBox(width: 6),
           Text(
             label,
             style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[800],
-              fontWeight: FontWeight.w600,
+              fontSize: 11,
+              color: color,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.1,
             ),
           ),
         ],
@@ -853,74 +1004,228 @@ class _ReportScreenState extends State<ReportScreen> with TickerProviderStateMix
     );
   }
 
+  // ===================== CALENDAR =====================
+
+  Widget _buildCalendarCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: ReportDesign.surface,
+        borderRadius: BorderRadius.circular(ReportDesign.radiusLg),
+        border: Border.all(color: ReportDesign.border, width: 1),
+        boxShadow: ReportDesign.softShadow,
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(ReportDesign.radiusLg),
+        child: TableCalendar<dynamic>(
+          firstDay: DateTime.utc(2020, 1, 1),
+          lastDay: DateTime.utc(2030, 12, 31),
+          focusedDay: _focusedDay,
+          calendarFormat: _calendarFormat,
+          eventLoader: _getEventsForDay,
+          startingDayOfWeek: StartingDayOfWeek.monday,
+          selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+          onDaySelected: (selectedDay, focusedDay) {
+            if (!isSameDay(_selectedDay, selectedDay)) {
+              setState(() {
+                _selectedDay = selectedDay;
+                _focusedDay = focusedDay;
+              });
+            }
+          },
+          onFormatChanged: (format) {
+            if (_calendarFormat != format) {
+              setState(() => _calendarFormat = format);
+            }
+          },
+          onPageChanged: (focusedDay) {
+            setState(() => _focusedDay = focusedDay);
+            _loadAttendance(month: focusedDay.month, year: focusedDay.year);
+          },
+          calendarStyle: const CalendarStyle(
+            outsideDaysVisible: false,
+            markersMaxCount: 0,
+            cellMargin: EdgeInsets.zero,
+            cellPadding: EdgeInsets.zero,
+          ),
+          calendarBuilders: CalendarBuilders(
+            // Hide the tiny dot marker completely
+            markerBuilder: (context, day, events) => const SizedBox.shrink(),
+
+            defaultBuilder: (context, day, focusedDay) =>
+                _buildDayCell(day, isToday: false, isSelected: false),
+
+            todayBuilder: (context, day, focusedDay) =>
+                _buildDayCell(day, isToday: true, isSelected: false),
+
+            selectedBuilder: (context, day, focusedDay) => _buildDayCell(
+              day,
+              isToday: isSameDay(day, DateTime.now()),
+              isSelected: true,
+            ),
+
+            holidayBuilder: (context, day, focusedDay) =>
+                _buildDayCell(day, isToday: false, isSelected: false),
+          ),
+          headerStyle: HeaderStyle(
+            formatButtonVisible: true,
+            titleCentered: true,
+            formatButtonShowsNext: false,
+            formatButtonPadding:
+            const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            formatButtonDecoration: BoxDecoration(
+              color: ReportDesign.primarySoft,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: ReportDesign.primaryLight,
+                width: 1,
+              ),
+            ),
+            formatButtonTextStyle: const TextStyle(
+              color: ReportDesign.primaryDark,
+              fontWeight: FontWeight.w800,
+              fontSize: 11.5,
+              letterSpacing: 0.3,
+            ),
+            titleTextStyle: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: ReportDesign.textPrimary,
+              letterSpacing: -0.2,
+            ),
+            leftChevronIcon: const Icon(
+              Icons.chevron_left_rounded,
+              color: ReportDesign.primary,
+              size: 24,
+            ),
+            rightChevronIcon: const Icon(
+              Icons.chevron_right_rounded,
+              color: ReportDesign.primary,
+              size: 24,
+            ),
+            headerPadding:
+            const EdgeInsets.symmetric(vertical: ReportDesign.sm + 4),
+          ),
+          daysOfWeekStyle: DaysOfWeekStyle(
+            weekdayStyle: const TextStyle(
+              color: ReportDesign.textMuted,
+              fontWeight: FontWeight.w800,
+              fontSize: 11,
+              letterSpacing: 0.5,
+            ),
+            weekendStyle: TextStyle(
+              color: ReportDesign.absent.withOpacity(0.6),
+              fontWeight: FontWeight.w800,
+              fontSize: 11,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===================== SELECTED DAY EVENTS =====================
+
   Widget _buildSelectedDayEvents() {
     final events = _getEventsForDay(_selectedDay!);
 
-    String _formatTime(dynamic timeValue) {
-      if (timeValue == null || timeValue.toString().isEmpty) return "—";
-      try {
-        final dt = DateTime.parse(timeValue.toString()).toLocal();
-        return DateFormat('hh:mm a').format(dt);
-      } catch (_) {
-        return timeValue.toString();
-      }
-    }
-
-    String _formatDate(DateTime date) {
-      return DateFormat('EEE, MMM d, yyyy').format(date);
-    }
-
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 8,
-            offset: Offset(0, 4),
-          ),
-        ],
+        color: ReportDesign.surface,
+        borderRadius: BorderRadius.circular(ReportDesign.radiusLg),
+        border: Border.all(color: ReportDesign.border, width: 1),
+        boxShadow: ReportDesign.softShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Colors.indigo.shade400, Colors.indigo.shade600],
-              ),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          // Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              ReportDesign.md,
+              ReportDesign.md,
+              ReportDesign.md,
+              ReportDesign.sm,
             ),
             child: Row(
               children: [
-                Icon(Icons.event_note, color: Colors.white, size: 24),
-                SizedBox(width: 10),
-                Text(
-                  'Attendance - ${_formatDate(_selectedDay!)}',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: ReportDesign.primarySoft,
+                    borderRadius:
+                    BorderRadius.circular(ReportDesign.radiusSm - 2),
+                    border: Border.all(
+                      color: ReportDesign.primaryLight,
+                      width: 1,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.event_note_rounded,
+                    color: ReportDesign.primary,
+                    size: 16,
+                  ),
+                ),
+                const SizedBox(width: ReportDesign.sm + 2),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Attendance',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: ReportDesign.textPrimary,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        DateFormat('EEE, MMM d, yyyy').format(_selectedDay!),
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          color: ReportDesign.textMuted,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
+          Container(height: 1, color: ReportDesign.border),
+
+          // Content
           if (events.isEmpty)
             Padding(
-              padding: EdgeInsets.all(40),
+              padding: const EdgeInsets.all(ReportDesign.xl),
               child: Center(
                 child: Column(
                   children: [
-                    Icon(Icons.event_busy, size: 50, color: Colors.grey[400]),
-                    SizedBox(height: 12),
-                    Text(
-                      'No attendance records for this day',
-                      style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                    Container(
+                      width: 72,
+                      height: 72,
+                      decoration: const BoxDecoration(
+                        color: ReportDesign.neutralSoft,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.event_busy_rounded,
+                        size: 32,
+                        color: ReportDesign.textMuted,
+                      ),
+                    ),
+                    const SizedBox(height: ReportDesign.md),
+                    const Text(
+                      'No records for this day',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: ReportDesign.textMuted,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ],
                 ),
@@ -928,19 +1233,15 @@ class _ReportScreenState extends State<ReportScreen> with TickerProviderStateMix
             )
           else
             Padding(
-              padding: EdgeInsets.all(12),
+              padding: const EdgeInsets.all(ReportDesign.md - 2),
               child: Column(
                 children: events.map<Widget>((attendance) {
-                  // Check if it's a holiday
                   final status = attendance['status'] ?? 'N/A';
-
-                  if (status == 'holiday') {
-                    // Show holiday card
+                  if (status == 'holiday' ||
+                      status == 'public-holiday') {
                     return _buildHolidayCard(attendance);
-                  } else {
-                    // Show regular attendance card
-                    return _buildAttendanceCard(attendance);
                   }
+                  return _buildAttendanceCard(attendance);
                 }).toList(),
               ),
             ),
@@ -949,109 +1250,111 @@ class _ReportScreenState extends State<ReportScreen> with TickerProviderStateMix
     );
   }
 
-// Holiday Card Widget
+  // ===================== HOLIDAY CARD =====================
+
   Widget _buildHolidayCard(Map<String, dynamic> attendance) {
     final holidayName = attendance['holidayName'] ?? 'Holiday';
     final holidayType = attendance['holidayType'] ?? 'General';
 
-    // Determine icon based on holiday type
     IconData holidayIcon = Icons.celebration_outlined;
-    Color holidayColor = Colors.green;
+    Color holidayColor = ReportDesign.comboOff;
 
     if (holidayType.toLowerCase().contains('religious')) {
       holidayIcon = Icons.church_outlined;
-      holidayColor = Colors.purple;
+      holidayColor = ReportDesign.leave;
     } else if (holidayType.toLowerCase().contains('national')) {
       holidayIcon = Icons.flag_outlined;
-      holidayColor = Colors.red;
+      holidayColor = ReportDesign.absent;
     } else if (holidayType.toLowerCase().contains('public')) {
       holidayIcon = Icons.beach_access_outlined;
-      holidayColor = Colors.blue;
+      holidayColor = ReportDesign.holiday;
     }
 
     return Container(
-      margin: EdgeInsets.symmetric(vertical: 8),
-      padding: EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(vertical: ReportDesign.xs + 2),
+      padding: const EdgeInsets.all(ReportDesign.md),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [holidayColor.withOpacity(0.1), holidayColor.withOpacity(0.05)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+        color: holidayColor.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(ReportDesign.radiusMd),
+        border: Border.all(
+          color: holidayColor.withOpacity(0.25),
+          width: 1,
         ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: holidayColor.withOpacity(0.3), width: 2),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: holidayColor.withOpacity(0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(holidayIcon, color: holidayColor, size: 24),
-                  ),
-                  SizedBox(width: 12),
-                  Text(
-                    holidayName,
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: holidayColor,
-                    ),
-                  ),
-                ],
-              ),
               Container(
-                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
-                  color: holidayColor.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(20),
+                  color: holidayColor.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(ReportDesign.radiusSm),
                 ),
-                child: Text(
-                  holidayType,
-                  style: TextStyle(
-                    color: holidayColor,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
+                child: Icon(holidayIcon, color: holidayColor, size: 20),
+              ),
+              const SizedBox(width: ReportDesign.sm + 4),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      holidayName,
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w800,
+                        color: holidayColor,
+                        letterSpacing: -0.2,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 3),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: ReportDesign.sm,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: holidayColor.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        holidayType.toUpperCase(),
+                        style: TextStyle(
+                          color: holidayColor,
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: ReportDesign.md),
+          Container(height: 1, color: holidayColor.withOpacity(0.15)),
+          const SizedBox(height: ReportDesign.sm + 2),
           Row(
             children: [
-              Icon(Icons.info_outline_rounded, color: holidayColor, size: 20),
-              SizedBox(width: 8),
+              Icon(
+                Icons.info_outline_rounded,
+                color: holidayColor.withOpacity(0.7),
+                size: 14,
+              ),
+              const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   'No attendance required. Enjoy your holiday!',
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 12,
                     color: holidayColor.withOpacity(0.8),
+                    fontWeight: FontWeight.w500,
                   ),
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 12),
-          Row(
-            children: [
-              Icon(Icons.access_time_rounded, color: holidayColor, size: 20),
-              SizedBox(width: 8),
-              Text(
-                'Work Hours: 0 hrs',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: holidayColor,
                 ),
               ),
             ],
@@ -1061,144 +1364,395 @@ class _ReportScreenState extends State<ReportScreen> with TickerProviderStateMix
     );
   }
 
-// Regular Attendance Card Widget
+  // ===================== ATTENDANCE CARD =====================
+
   Widget _buildAttendanceCard(Map<String, dynamic> attendance) {
-    final checkInRaw = attendance['checkInTimeFormatted'] ?? attendance['checkIn']?['time'];
-    final checkOutRaw = attendance['checkOutTimeFormatted'] ?? attendance['checkOut']?['time'];
+    final checkInRaw =
+        attendance['checkInTimeFormatted'] ?? attendance['checkIn']?['time'];
+    final checkOutRaw = attendance['checkOutTimeFormatted'] ??
+        attendance['checkOut']?['time'];
 
     final checkIn = _formatTime(checkInRaw);
     final checkOut = _formatTime(checkOutRaw);
-    final workHours = attendance['workHours'] ?? 0;
+    final workHours = (attendance['workHours'] ?? 0) as num;
     final status = attendance['status'] ?? 'N/A';
     final isLate = attendance['isLate'] == true;
     final lateBy = attendance['lateBy'] ?? 0;
     final isShortAttendance = attendance['isShortAttendance'] == true;
     final shortByMinutes = attendance['shortByMinutes'] ?? 0;
+    final missedCheckout = attendance['missedCheckout'] == true;
+    final holidayName = attendance['holidayName'];
+    final holidayType = attendance['holidayType'];
+    final isWeeklyOffWork = attendance['isWeeklyOffWork'] == true;
+    final shift = attendance['shiftSnapshot'] as Map<String, dynamic>?;
 
-    // Determine status color
-    Color statusColor = Colors.indigo;
-    if (status == 'present') {
-      statusColor = Colors.green;
-    } else if (status == 'absent') {
-      statusColor = Colors.red;
-    } else if (status == 'halfday') {
-      statusColor = Colors.orange;
-    }
+    final (statusColor, statusSoft, statusBorder) = _statusStyle(
+      status,
+      isLate: isLate,
+      isShortAttendance: isShortAttendance,
+    );
 
     return Container(
-      margin: EdgeInsets.symmetric(vertical: 8),
-      padding: EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(vertical: ReportDesign.xs + 2),
+      padding: const EdgeInsets.all(ReportDesign.md - 2),
       decoration: BoxDecoration(
-        color: statusColor.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: statusColor.withOpacity(0.3)),
+        color: statusSoft,
+        borderRadius: BorderRadius.circular(ReportDesign.radiusMd),
+        border: Border.all(color: statusBorder, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(Icons.verified_user, color: statusColor, size: 20),
-                  ),
-                  SizedBox(width: 8),
-                  Text(
-                    status.toUpperCase(),
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: statusColor,
-                    ),
-                  ),
-                ],
-              ),
-              Row(
-                children: [
-                  if (isLate)
-                    Container(
-                      margin: EdgeInsets.only(left: 6),
-                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.red.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        'Late by $lateBy min',
-                        style: TextStyle(
-                          color: Colors.red.shade600,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  if (isShortAttendance)
-                    Container(
-                      margin: EdgeInsets.only(left: 6),
-                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.orange.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        'Short by $shortByMinutes min',
-                        style: TextStyle(
-                          color: Colors.orange.shade700,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ],
-          ),
-          SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _buildTimeTile(
-                icon: Icons.login_rounded,
-                label: "Check-In",
-                time: checkIn,
-                color: Colors.green,
-              ),
-              SizedBox(width: 10),
-              _buildTimeTile(
-                icon: Icons.logout_rounded,
-                label: "Check-Out",
-                time: checkOut,
-                color: Colors.red,
-              ),
-            ],
-          ),
-          SizedBox(height: 16),
+          // ===== Header =====
           Row(
             children: [
-              Icon(Icons.access_time_rounded, color: Colors.amber[700], size: 20),
-              SizedBox(width: 8),
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.15),
+                  borderRadius:
+                  BorderRadius.circular(ReportDesign.radiusSm - 2),
+                ),
+                child: Icon(Icons.verified_user_rounded,
+                    color: statusColor, size: 17),
+              ),
+              const SizedBox(width: ReportDesign.sm + 2),
               Text(
-                'Work Hours: ${workHours.toStringAsFixed(2)} hrs',
+                status.toString().replaceAll('-', ' ').toUpperCase(),
                 style: TextStyle(
-                  fontSize: 15,
-                  color: Colors.grey[800],
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: statusColor,
+                  letterSpacing: 0.4,
+                ),
+              ),
+              const Spacer(),
+              if (isLate)
+                _buildTag('LATE · ${lateBy}m', ReportDesign.late,
+                    ReportDesign.lateSoft, ReportDesign.lateBorder),
+              if (isShortAttendance) ...[
+                if (isLate) const SizedBox(width: 6),
+                _buildTag('SHORT · ${shortByMinutes}m', ReportDesign.short,
+                    ReportDesign.shortSoft, ReportDesign.shortBorder),
+              ],
+            ],
+          ),
+
+          const SizedBox(height: ReportDesign.md),
+
+          // ===== Check In (full punch) =====
+          _buildPunchTile(
+            title: 'CHECK IN',
+            icon: Icons.login_rounded,
+            color: ReportDesign.present,
+            timeFormatted: checkIn,
+            punch: attendance['checkIn'] as Map<String, dynamic>?,
+          ),
+
+          const SizedBox(height: ReportDesign.sm),
+
+          // ===== Check Out (full punch) =====
+          _buildPunchTile(
+            title: 'CHECK OUT',
+            icon: Icons.logout_rounded,
+            color: missedCheckout
+                ? ReportDesign.absent
+                : ReportDesign.absent,
+            timeFormatted: missedCheckout ? 'Missed' : checkOut,
+            punch: attendance['checkOut'] as Map<String, dynamic>?,
+            isMissed: missedCheckout,
+          ),
+
+          const SizedBox(height: ReportDesign.sm + 2),
+
+          // ===== Work hours =====
+          _buildInfoRow(
+            icon: Icons.timer_outlined,
+            label: 'WORK HOURS',
+            value: '${workHours.toStringAsFixed(2)} hrs',
+            color: ReportDesign.late,
+          ),
+
+          // ===== Shift =====
+          if (shift != null) ...[
+            const SizedBox(height: ReportDesign.sm),
+            _buildInfoRow(
+              icon: Icons.work_outline_rounded,
+              label: 'SHIFT',
+              value: '${shift['name']} · '
+                  '${shift['startTime']}–${shift['endTime']}',
+              color: ReportDesign.primary,
+            ),
+          ],
+
+          // ===== Holiday worked =====
+          if (holidayName != null && holidayName.toString().isNotEmpty) ...[
+            const SizedBox(height: ReportDesign.sm),
+            _buildInfoRow(
+              icon: Icons.celebration_outlined,
+              label: 'HOLIDAY',
+              value: holidayType != null
+                  ? '$holidayName · $holidayType'
+                  : holidayName.toString(),
+              color: ReportDesign.holiday,
+              softBg: ReportDesign.holidaySoft,
+              borderColor: ReportDesign.holidayBorder,
+            ),
+          ],
+
+          // ===== Weekly off worked =====
+          if (isWeeklyOffWork) ...[
+            const SizedBox(height: ReportDesign.sm),
+            _buildInfoRow(
+              icon: Icons.weekend_rounded,
+              label: 'WEEKLY OFF WORK',
+              value: 'Worked on weekly off',
+              color: ReportDesign.leave,
+              softBg: ReportDesign.leaveSoft,
+              borderColor: ReportDesign.leaveBorder,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPunchTile({
+    required String title,
+    required IconData icon,
+    required Color color,
+    required String timeFormatted,
+    required Map<String, dynamic>? punch,
+    bool isMissed = false,
+  }) {
+    final location = punch?['location'] as Map<String, dynamic>?;
+    final address = location?['address']?.toString();
+    final matchedName = location?['matchedLocationName']?.toString();
+    final distance = location?['distanceFromOffice'];
+    final deviceInfo = punch?['deviceInfo']?.toString();
+    final punchedFrom = punch?['punchedFrom']?.toString();
+    final verification = punch?['verificationMethod']?.toString();
+    final faceVerified = punch?['faceVerified'] == true;
+    final faceSimilarity = punch?['faceSimilarity'];
+    final gpsBypassed = punch?['isGpsBypassed'] == true;
+    final hasPunch = punch != null && punch['time'] != null;
+
+    return Container(
+      padding: const EdgeInsets.all(ReportDesign.sm + 4),
+      decoration: BoxDecoration(
+        color: ReportDesign.surface,
+        borderRadius: BorderRadius.circular(ReportDesign.radiusSm),
+        border: Border.all(color: ReportDesign.border, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ---- Header ----
+          Row(
+            children: [
+              Icon(icon, color: color, size: 13),
+              const SizedBox(width: 5),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w800,
+                  color: color,
+                  letterSpacing: 0.4,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                timeFormatted,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: isMissed ? ReportDesign.absent : ReportDesign.textPrimary,
+                  letterSpacing: -0.2,
                 ),
               ),
             ],
+          ),
+
+          if (hasPunch) ...[
+            // ---- Location ----
+            if (matchedName != null || address != null) ...[
+              const SizedBox(height: ReportDesign.sm),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.location_on_outlined,
+                      size: 12, color: ReportDesign.textMuted),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (matchedName != null)
+                          Text(
+                            matchedName,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: ReportDesign.textPrimary,
+                            ),
+                          ),
+                        if (address != null)
+                          Text(
+                            address,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: ReportDesign.textMuted,
+                              height: 1.3,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  if (distance != null)
+                    _buildTag(
+                      '${distance}m',
+                      ReportDesign.primary,
+                      ReportDesign.primarySoft,
+                      ReportDesign.primaryLight,
+                    ),
+                ],
+              ),
+            ],
+
+            // ---- Verification / device chips ----
+            if (verification != null ||
+                deviceInfo != null ||
+                punchedFrom != null ||
+                faceVerified ||
+                gpsBypassed) ...[
+              const SizedBox(height: ReportDesign.sm),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  if (verification != null)
+                    _buildChip(
+                      Icons.verified_outlined,
+                      verification,
+                      ReportDesign.present,
+                      ReportDesign.presentSoft,
+                      ReportDesign.presentBorder,
+                    ),
+                  if (faceVerified)
+                    _buildChip(
+                      Icons.face_retouching_natural,
+                      faceSimilarity != null
+                          ? 'Face ${((double.tryParse(faceSimilarity.toString()) ?? 0) * 100).round()}%'
+                          : 'Face ✓',
+                      ReportDesign.present,
+                      ReportDesign.presentSoft,
+                      ReportDesign.presentBorder,
+                    ),
+                  if (punchedFrom != null)
+                    _buildChip(
+                      Icons.smartphone_rounded,
+                      punchedFrom,
+                      ReportDesign.primary,
+                      ReportDesign.primarySoft,
+                      ReportDesign.primaryLight,
+                    ),
+                  if (deviceInfo != null)
+                    _buildChip(
+                      Icons.phone_android_rounded,
+                      deviceInfo,
+                      ReportDesign.neutral,
+                      ReportDesign.neutralSoft,
+                      ReportDesign.neutralBorder,
+                    ),
+                  if (gpsBypassed)
+                    _buildChip(
+                      Icons.warning_amber_rounded,
+                      'GPS bypassed',
+                      ReportDesign.absent,
+                      ReportDesign.absentSoft,
+                      ReportDesign.absentBorder,
+                    ),
+                ],
+              ),
+            ],
+          ],
+
+          // ---- Missed checkout hint ----
+          if (isMissed) ...[
+            const SizedBox(height: ReportDesign.sm),
+            const Text(
+              'No checkout punch recorded for this day.',
+              style: TextStyle(
+                fontSize: 11,
+                color: ReportDesign.absent,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChip(
+      IconData icon,
+      String label,
+      Color color,
+      Color bg,
+      Color border,
+      ) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: border, width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 10, color: color),
+          const SizedBox(width: 3),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 9.5,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
           ),
         ],
       ),
     );
   }
 
-// Helper method for time tiles (already exists)
+  Widget _buildTag(String label, Color color, Color bg, Color border) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: ReportDesign.sm,
+        vertical: 3,
+      ),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: border, width: 1),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 9.5,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.4,
+        ),
+      ),
+    );
+  }
+
   Widget _buildTimeTile({
     required IconData icon,
     required String label,
@@ -1207,36 +1761,38 @@ class _ReportScreenState extends State<ReportScreen> with TickerProviderStateMix
   }) {
     return Expanded(
       child: Container(
-        padding: EdgeInsets.all(12),
+        padding: const EdgeInsets.all(ReportDesign.sm + 4),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.3)),
+          color: ReportDesign.surface,
+          borderRadius: BorderRadius.circular(ReportDesign.radiusSm),
+          border: Border.all(color: ReportDesign.border, width: 1),
         ),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(icon, color: color, size: 20),
-                SizedBox(width: 6),
+                Icon(icon, color: color, size: 13),
+                const SizedBox(width: 5),
                 Text(
-                  label,
+                  label.toUpperCase(),
                   style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w800,
                     color: color,
+                    letterSpacing: 0.4,
                   ),
                 ),
               ],
             ),
-            SizedBox(height: 6),
+            const SizedBox(height: ReportDesign.sm),
             Text(
               time,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[800],
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: ReportDesign.textPrimary,
+                letterSpacing: -0.2,
               ),
             ),
           ],
@@ -1245,119 +1801,131 @@ class _ReportScreenState extends State<ReportScreen> with TickerProviderStateMix
     );
   }
 
-// Helper method to format time (already exists but moved outside)
-  String _formatTime(dynamic timeValue) {
-    if (timeValue == null || timeValue.toString().isEmpty) return "—";
-    try {
-      final dt = DateTime.parse(timeValue.toString()).toLocal();
-      return DateFormat('hh:mm a').format(dt);
-    } catch (_) {
-      return timeValue.toString();
-    }
+  // ===================== INFO ROW HELPER =====================
+
+  Widget _buildInfoRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+    Color? softBg,
+    Color? borderColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: ReportDesign.sm + 4,
+        vertical: ReportDesign.sm,
+      ),
+      decoration: BoxDecoration(
+        color: softBg ?? ReportDesign.surface,
+        borderRadius: BorderRadius.circular(ReportDesign.radiusSm),
+        border: Border.all(
+          color: borderColor ?? ReportDesign.border,
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 14),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              color: ReportDesign.textMuted,
+              letterSpacing: 0.6,
+            ),
+          ),
+          const Spacer(),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w800,
+                color: ReportDesign.textPrimary,
+                letterSpacing: -0.2,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
-  // Widget _buildTimeTile({
-  //   required IconData icon,
-  //   required String label,
-  //   required String time,
-  //   required Color color,
-  // }) {
-  //   return Expanded(
-  //     child: Container(
-  //       padding: EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-  //       decoration: BoxDecoration(
-  //         color: Colors.white,
-  //         borderRadius: BorderRadius.circular(12),
-  //         border: Border.all(color: color.withOpacity(0.3)),
-  //       ),
-  //       child: Row(
-  //         children: [
-  //           Icon(icon, color: color, size: 20),
-  //           SizedBox(width: 8),
-  //           Column(
-  //             crossAxisAlignment: CrossAxisAlignment.start,
-  //             children: [
-  //               Text(
-  //                 label,
-  //                 style: TextStyle(
-  //                   fontSize: 13,
-  //                   color: Colors.grey[600],
-  //                 ),
-  //               ),
-  //               Text(
-  //                 time,
-  //                 style: TextStyle(
-  //                   fontSize: 15,
-  //                   fontWeight: FontWeight.w600,
-  //                   color: Colors.black87,
-  //                 ),
-  //               ),
-  //             ],
-  //           ),
-  //         ],
-  //       ),
-  //     ),
-  //   );
-  // }
+  // ===================== STATS OVERVIEW =====================
 
   Widget _buildStatsOverview() {
     final stats = _attendanceData!['stats'] as Map<String, dynamic>? ?? {};
 
     return Container(
-      margin: EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 10,
-            offset: Offset(0, 4),
-          ),
-        ],
+        color: ReportDesign.surface,
+        borderRadius: BorderRadius.circular(ReportDesign.radiusLg),
+        border: Border.all(color: ReportDesign.border, width: 1),
+        boxShadow: ReportDesign.softShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Colors.indigo[50]!, Colors.indigo[100]!],
-              ),
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(16),
-                topRight: Radius.circular(16),
-              ),
-            ),
+          Padding(
+            padding: const EdgeInsets.all(ReportDesign.md),
             child: Row(
               children: [
-                Icon(Icons.bar_chart, color: Colors.indigo[600], size: 24),
-                SizedBox(width: 12),
-                Text(
-                  'Attendance Statistics',
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: ReportDesign.primarySoft,
+                    borderRadius:
+                    BorderRadius.circular(ReportDesign.radiusSm - 2),
+                    border: Border.all(
+                      color: ReportDesign.primaryLight,
+                      width: 1,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.bar_chart_rounded,
+                    color: ReportDesign.primary,
+                    size: 16,
+                  ),
+                ),
+                const SizedBox(width: ReportDesign.sm + 2),
+                const Text(
+                  'Statistics',
                   style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.indigo[600],
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: ReportDesign.textPrimary,
+                    letterSpacing: -0.2,
                   ),
                 ),
               ],
             ),
           ),
+          Container(height: 1, color: ReportDesign.border),
           Padding(
-            padding: EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(
+              ReportDesign.md - 2,
+              22, // Top spacing reduced
+              ReportDesign.md - 2,
+              ReportDesign.md - 2,
+            ),
             child: GridView.count(
               shrinkWrap: true,
-              physics: NeverScrollableScrollPhysics(),
+              padding: EdgeInsets.zero,
+              physics: const NeverScrollableScrollPhysics(),
               crossAxisCount: 2,
-              childAspectRatio: 1.5,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
+              childAspectRatio: 1.6,
+              crossAxisSpacing: ReportDesign.sm + 2,
+              mainAxisSpacing: ReportDesign.sm + 2,
               children: stats.entries
-                  .map<Widget>((entry) => _buildStatCard(context, entry.key, entry.value))
+                  .map<Widget>((entry) =>
+                  _buildStatCard(context, entry.key, entry.value))
                   .toList(),
             ),
           ),
@@ -1366,34 +1934,86 @@ class _ReportScreenState extends State<ReportScreen> with TickerProviderStateMix
     );
   }
 
-  Widget _buildStatCard(BuildContext context, String key, dynamic value) {
-    // Normalize key (ignore case and spacing)
+  Widget _buildStatCard(
+      BuildContext context,
+      String key,
+      dynamic value,
+      ) {
     final normalizedKey = key.toLowerCase().replaceAll(' ', '');
 
-    // Define icons and colors
     final Map<String, Map<String, dynamic>> statConfig = {
-      'totaldays': {'icon': Icons.calendar_today, 'color': Colors.blue},
-      'present': {'icon': Icons.check_circle, 'color': Colors.green},
-      'absent': {'icon': Icons.cancel, 'color': Colors.red},
-      'halfday': {'icon': Icons.remove_circle_outline, 'color': Colors.orange},
-      'onleave': {'icon': Icons.beach_access, 'color': Colors.teal},
-      'holiday': {'icon': Icons.card_giftcard, 'color': Colors.pink},
-      'weeklyoff': {'icon': Icons.weekend, 'color': Colors.purple},
-      'combooff': {'icon': Icons.event_available, 'color': Colors.deepPurple},
-      'totalworkhours': {'icon': Icons.schedule, 'color': Colors.indigo},
-      'latecount': {'icon': Icons.access_time, 'color': Colors.amber},
+      'totaldays': {
+        'icon': Icons.calendar_month_rounded,
+        'color': ReportDesign.holiday,
+        'bg': ReportDesign.holidaySoft,
+        'border': ReportDesign.holidayBorder,
+      },
+      'present': {
+        'icon': Icons.check_circle_rounded,
+        'color': ReportDesign.present,
+        'bg': ReportDesign.presentSoft,
+        'border': ReportDesign.presentBorder,
+      },
+      'absent': {
+        'icon': Icons.cancel_rounded,
+        'color': ReportDesign.absent,
+        'bg': ReportDesign.absentSoft,
+        'border': ReportDesign.absentBorder,
+      },
+      'halfday': {
+        'icon': Icons.remove_circle_outline_rounded,
+        'color': ReportDesign.short,
+        'bg': ReportDesign.shortSoft,
+        'border': ReportDesign.shortBorder,
+      },
+      'onleave': {
+        'icon': Icons.beach_access_rounded,
+        'color': ReportDesign.leave,
+        'bg': ReportDesign.leaveSoft,
+        'border': ReportDesign.leaveBorder,
+      },
+      'holiday': {
+        'icon': Icons.card_giftcard_rounded,
+        'color': ReportDesign.holiday,
+        'bg': ReportDesign.holidaySoft,
+        'border': ReportDesign.holidayBorder,
+      },
+      'weeklyoff': {
+        'icon': Icons.weekend_rounded,
+        'color': ReportDesign.leave,
+        'bg': ReportDesign.leaveSoft,
+        'border': ReportDesign.leaveBorder,
+      },
+      'combooff': {
+        'icon': Icons.event_available_rounded,
+        'color': ReportDesign.comboOff,
+        'bg': ReportDesign.comboOffSoft,
+        'border': ReportDesign.comboOffBorder,
+      },
+      'totalworkhours': {
+        'icon': Icons.schedule_rounded,
+        'color': ReportDesign.primary,
+        'bg': ReportDesign.primarySoft,
+        'border': ReportDesign.primaryLight,
+      },
+      'latecount': {
+        'icon': Icons.access_time_rounded,
+        'color': ReportDesign.late,
+        'bg': ReportDesign.lateSoft,
+        'border': ReportDesign.lateBorder,
+      },
     };
 
     final config = statConfig[normalizedKey] ??
-        {'icon': Icons.info, 'color': Colors.grey};
+        {
+          'icon': Icons.info_rounded,
+          'color': ReportDesign.neutral,
+          'bg': ReportDesign.neutralSoft,
+          'border': ReportDesign.neutralBorder,
+        };
 
-    // Format value
-    String formattedValue;
-    if (value is double) {
-      formattedValue = value.toStringAsFixed(1);
-    } else {
-      formattedValue = '$value';
-    }
+    final String formattedValue =
+    value is double ? value.toStringAsFixed(1) : '$value';
 
     return GestureDetector(
       onTap: () {
@@ -1401,55 +2021,62 @@ class _ReportScreenState extends State<ReportScreen> with TickerProviderStateMix
           showModalBottomSheet(
             context: context,
             isScrollControlled: true,
-            backgroundColor: Colors.white,
-            shape: const RoundedRectangleBorder(
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-            ),
-            builder: (context) => const MonthlyWorkHoursBottomSheet(),
+            backgroundColor: Colors.transparent,
+            builder: (_) => const MonthlyWorkHoursBottomSheet(),
           );
         }
       },
       child: Container(
         decoration: BoxDecoration(
-          color: config['color'].withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: config['color'].withOpacity(0.3)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Icon(config['icon'], color: config['color'], size: 28),
-              const SizedBox(height: 6),
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  formattedValue,
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: config['color'],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                _formatKey(key),
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[700],
-                  fontWeight: FontWeight.w500,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
+          color: config['bg'] as Color,
+          borderRadius: BorderRadius.circular(ReportDesign.radiusSm + 2),
+          border: Border.all(
+            color: config['border'] as Color,
+            width: 1,
           ),
+        ),
+        padding: const EdgeInsets.all(ReportDesign.sm + 2),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              config['icon'] as IconData,
+              color: config['color'] as Color,
+              size: 20,
+            ),
+            const SizedBox(height: 6),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                formattedValue,
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: config['color'] as Color,
+                  letterSpacing: -0.4,
+                ),
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              _formatKey(key),
+              style: const TextStyle(
+                fontSize: 10.5,
+                color: ReportDesign.textSecondary,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.1,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
         ),
       ),
     );
   }
+
+  // ===================== HELPERS =====================
 
   String _formatKey(String key) {
     return key
@@ -1457,12 +2084,17 @@ class _ReportScreenState extends State<ReportScreen> with TickerProviderStateMix
         .replaceAll('_', ' ')
         .trim()
         .split(' ')
-        .map((w) => w[0].toUpperCase() + w.substring(1))
+        .map((w) => w.isNotEmpty ? w[0].toUpperCase() + w.substring(1) : w)
         .join(' ');
   }
 
-  String _formatDate(DateTime date) {
-    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return '${date.day} ${months[date.month - 1]}, ${date.year}';
+  String _formatTime(dynamic timeValue) {
+    if (timeValue == null || timeValue.toString().isEmpty) return '—';
+    try {
+      final dt = DateTime.parse(timeValue.toString()).toLocal();
+      return DateFormat('hh:mm a').format(dt);
+    } catch (_) {
+      return timeValue.toString();
+    }
   }
 }

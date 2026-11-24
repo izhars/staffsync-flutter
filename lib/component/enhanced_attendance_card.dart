@@ -2,6 +2,72 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 
+// ===================== DESIGN TOKENS =====================
+
+class AttendanceDesign {
+  static const double xs = 4;
+  static const double sm = 8;
+  static const double md = 16;
+  static const double lg = 24;
+  static const double xl = 32;
+
+  static const double radiusSm = 10;
+  static const double radiusMd = 14;
+  static const double radiusLg = 20;
+  static const double radiusXl = 24;
+
+  // Neutral palette
+  static const Color surface = Colors.white;
+  static const Color surfaceMuted = Color(0xFFF8FAFC);
+  static const Color border = Color(0xFFEAECEF);
+  static const Color textPrimary = Color(0xFF1A1D26);
+  static const Color textSecondary = Color(0xFF6B7280);
+  static const Color textMuted = Color(0xFF9CA3AF);
+
+  // State colors
+  static const Color success = Color(0xFF059669);       // emerald-600
+  static const Color successSoft = Color(0xFFECFDF5);
+  static const Color successBorder = Color(0xFFA7F3D0);
+
+  static const Color warning = Color(0xFFD97706);       // amber-600
+  static const Color warningSoft = Color(0xFFFFFBEB);
+  static const Color warningBorder = Color(0xFFFDE68A);
+
+  static const Color danger = Color(0xFFDC2626);        // red-600
+  static const Color dangerSoft = Color(0xFFFEF2F2);
+  static const Color dangerBorder = Color(0xFFFECACA);
+
+  static const Color info = Color(0xFF4F46E5);          // indigo-600
+  static const Color infoSoft = Color(0xFFEEF2FF);
+  static const Color infoBorder = Color(0xFFC7D2FE);
+
+  static const Color purple = Color(0xFF7C3AED);
+  static const Color purpleSoft = Color(0xFFF5F3FF);
+  static const Color purpleBorder = Color(0xFFDDD6FE);
+
+  static const Color teal = Color(0xFF0F766E);
+  static const Color tealSoft = Color(0xFFF0FDFA);
+  static const Color tealBorder = Color(0xFF99F6E4);
+
+  static List<BoxShadow> get softShadow => [
+    BoxShadow(
+      color: Colors.black.withOpacity(0.04),
+      blurRadius: 16,
+      offset: const Offset(0, 6),
+      spreadRadius: -4,
+    ),
+  ];
+
+  static List<BoxShadow> get cardShadow => [
+    BoxShadow(
+      color: Colors.black.withOpacity(0.06),
+      blurRadius: 24,
+      offset: const Offset(0, 10),
+      spreadRadius: -8,
+    ),
+  ];
+}
+
 class AttendanceSummaryCard extends StatefulWidget {
   final String? statusTitle;
   final String? currentDate;
@@ -46,290 +112,281 @@ class _AttendanceSummaryCardState extends State<AttendanceSummaryCard> {
   final LocalAuthentication _auth = LocalAuthentication();
   bool _isAuthenticating = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _checkBiometricAvailability();
-  }
-
-  // Check if biometric authentication is available on the device
-  Future<void> _checkBiometricAvailability() async {
-    try {
-      final bool canAuthenticateWithBiometrics = await _auth.canCheckBiometrics;
-      final bool canAuthenticate =
-          canAuthenticateWithBiometrics || await _auth.isDeviceSupported();
-
-      if (canAuthenticate) {
-        final List<BiometricType> availableBiometrics =
-        await _auth.getAvailableBiometrics();
-        debugPrint('Available biometrics: $availableBiometrics');
-      }
-    } catch (e) {
-      debugPrint('Error checking biometric availability: $e');
-    }
-  }
-
-  // Authenticate user with biometrics
-  Future<bool> _authenticateWithBiometrics(String action) async {
-    if (_isAuthenticating) return false;
-
-    try {
-      setState(() => _isAuthenticating = true);
-
-      final bool canCheckBiometrics = await _auth.canCheckBiometrics;
-      final bool isDeviceSupported = await _auth.isDeviceSupported();
-
-      // If device has no biometrics or no secure lock at all — directly punch
-      if (!canCheckBiometrics && !isDeviceSupported) {
-        debugPrint('No biometric or device lock available. Skipping auth...');
-        _showMessage('No biometric available. Auto $action successful!');
-        return true; // ✅ Directly allow check-in/out
-      }
-
-      // Proceed with authentication (if supported)
-      final bool didAuthenticate = await _auth.authenticate(
-        localizedReason: 'Please authenticate to $action',
-        options: const AuthenticationOptions(
-          biometricOnly: false,
-          stickyAuth: true,
-          useErrorDialogs: true,
-        ),
-      );
-
-      if (didAuthenticate) {
-        _showMessage('Authentication successful!');
-        return true;
-      } else {
-        _showMessage('Authentication failed or canceled');
-        return false;
-      }
-    } on PlatformException catch (e) {
-      debugPrint('PlatformException: ${e.code} - ${e.message}');
-      // In case of biometric not enrolled, unavailable, etc. — skip auth
-      if (e.code == 'NotAvailable' || e.code == 'NotEnrolled') {
-        _showMessage('No biometrics enrolled. Auto $action successful!');
-        return true; // ✅ Auto allow check-in/out
-      }
-
-      _showMessage('Authentication error: ${e.message}');
-      return false;
-    } catch (e) {
-      _showMessage('Unexpected error: $e');
-      debugPrint('Error during authentication: $e');
-      return false;
-    } finally {
-      if (mounted) setState(() => _isAuthenticating = false);
-    }
-  }
-
-
-  // Handle check-in with biometric authentication
   Future<void> _handleCheckIn() async {
-    final authenticated = await _authenticateWithBiometrics('check in');
-    if (authenticated && widget.onCheckIn != null) {
-      widget.onCheckIn!();
-    }
+    widget.onCheckIn?.call();
   }
 
-  // Handle check-out with biometric authentication
   Future<void> _handleCheckOut() async {
-    final authenticated = await _authenticateWithBiometrics('check out');
-    if (authenticated && widget.onCheckOut != null) {
-      widget.onCheckOut!();
-    }
+    widget.onCheckOut?.call();
   }
 
-  void _showMessage(String message) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          duration: const Duration(seconds: 2),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
-  }
+  // ===================== STATE / COLOR LOGIC =====================
 
-  // Get color scheme based on attendance status
-  AttendanceColorScheme _getColorScheme() {
-    if (widget.isCheckedOut) {
-      return AttendanceColorScheme(
-        primaryGradient: [Colors.teal.shade400, Colors.teal.shade700],
-        shadowColor: Colors.teal.shade400,
-        iconColor: Colors.teal.shade600,
-        accentColor: Colors.teal.shade500,
-      );
-    } else if (widget.isCheckedIn) {
+  _AttendanceState get _state {
+    if (widget.isCheckedOut) return _AttendanceState.completed;
+    if (widget.isCheckedIn) {
       if (widget.latenessMinutes != null && widget.latenessMinutes! > 0) {
-        return AttendanceColorScheme(
-          primaryGradient: [Colors.orange.shade400, Colors.orange.shade700],
-          shadowColor: Colors.orange.shade400,
-          iconColor: Colors.orange.shade600,
-          accentColor: Colors.orange.shade500,
-        );
-      } else {
-        return AttendanceColorScheme(
-          primaryGradient: [Colors.green.shade400, Colors.green.shade700],
-          shadowColor: Colors.green.shade400,
-          iconColor: Colors.green.shade600,
-          accentColor: Colors.green.shade500,
-        );
+        return _AttendanceState.late;
       }
-    } else {
-      return AttendanceColorScheme(
-        primaryGradient: [Colors.indigo.shade400, Colors.indigo.shade700],
-        shadowColor: Colors.indigo.shade400,
-        iconColor: Colors.indigo.shade600,
-        accentColor: Colors.indigo.shade500,
-      );
+      return _AttendanceState.active;
+    }
+    return _AttendanceState.pending;
+  }
+
+  Color get _stateColor {
+    switch (_state) {
+      case _AttendanceState.completed:
+        return AttendanceDesign.teal;
+      case _AttendanceState.active:
+        return AttendanceDesign.success;
+      case _AttendanceState.late:
+        return AttendanceDesign.warning;
+      case _AttendanceState.pending:
+        return AttendanceDesign.info;
     }
   }
+
+  Color get _stateSoftColor {
+    switch (_state) {
+      case _AttendanceState.completed:
+        return AttendanceDesign.tealSoft;
+      case _AttendanceState.active:
+        return AttendanceDesign.successSoft;
+      case _AttendanceState.late:
+        return AttendanceDesign.warningSoft;
+      case _AttendanceState.pending:
+        return AttendanceDesign.infoSoft;
+    }
+  }
+
+  Color get _stateBorderColor {
+    switch (_state) {
+      case _AttendanceState.completed:
+        return AttendanceDesign.tealBorder;
+      case _AttendanceState.active:
+        return AttendanceDesign.successBorder;
+      case _AttendanceState.late:
+        return AttendanceDesign.warningBorder;
+      case _AttendanceState.pending:
+        return AttendanceDesign.infoBorder;
+    }
+  }
+
+  String get _stateLabel {
+    switch (_state) {
+      case _AttendanceState.completed:
+        return 'Completed';
+      case _AttendanceState.active:
+        return 'Active';
+      case _AttendanceState.late:
+        return 'Late';
+      case _AttendanceState.pending:
+        return 'Pending';
+    }
+  }
+
+  IconData get _stateIcon {
+    switch (_state) {
+      case _AttendanceState.completed:
+        return Icons.task_alt_rounded;
+      case _AttendanceState.active:
+        return Icons.timelapse_rounded;
+      case _AttendanceState.late:
+        return Icons.warning_amber_rounded;
+      case _AttendanceState.pending:
+        return Icons.schedule_rounded;
+    }
+  }
+
+  // ===================== BUILD =====================
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = _getColorScheme();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surface = isDark ? const Color(0xFF1E2640) : AttendanceDesign.surface;
+    final border = isDark ? const Color(0xFF2D3748) : AttendanceDesign.border;
 
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 600),
-      curve: Curves.easeInOut,
-      margin: const EdgeInsets.all(10),
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.easeOutCubic,
+      margin: const EdgeInsets.symmetric(horizontal: 0),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        gradient: LinearGradient(
-          colors: colorScheme.primaryGradient,
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.shadowColor.withOpacity(0.3),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-            spreadRadius: 2,
-          ),
-        ],
+        color: surface,
+        borderRadius: BorderRadius.circular(AttendanceDesign.radiusLg),
+        border: Border.all(color: border, width: 1),
       ),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
-          gradient: LinearGradient(
-            colors: [
-              Colors.white.withOpacity(0.2),
-              Colors.white.withOpacity(0.1),
-            ],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeader(colorScheme),
-              const SizedBox(height: 24),
-              _buildContentBox(context, colorScheme),
-            ],
-          ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AttendanceDesign.radiusLg),
+        child: Column(
+          children: [
+            // ===== ACCENT HEADER BAR =====
+            _buildAccentBar(),
+
+            Padding(
+              padding: const EdgeInsets.all(AttendanceDesign.md + 2),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHeader(),
+                  const SizedBox(height: AttendanceDesign.md + 2),
+                  _buildDivider(),
+                  const SizedBox(height: AttendanceDesign.md + 2),
+                  _buildTimeInfoRow(),
+                  const SizedBox(height: AttendanceDesign.md),
+                  _buildInfoChips(),
+                  if (_hasDeviceOrLocationInfo()) ...[
+                    const SizedBox(height: AttendanceDesign.sm + 4),
+                    _buildDeviceLocationSection(),
+                  ],
+                  const SizedBox(height: AttendanceDesign.md + 4),
+                  _buildActionButtons(),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildHeader(AttendanceColorScheme colorScheme) {
+  // ===================== ACCENT BAR =====================
+
+  Widget _buildAccentBar() {
+    return Container(
+      height: 4,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            _stateColor,
+            _stateColor.withOpacity(0.6),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ===================== HEADER =====================
+
+  Widget _buildHeader() {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
+        // Status icon container
         AnimatedContainer(
-          duration: const Duration(milliseconds: 600),
-          padding: const EdgeInsets.all(12),
+          duration: const Duration(milliseconds: 400),
+          width: 48,
+          height: 48,
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.9),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.black12, width: 1),
+            color: _stateSoftColor,
+            borderRadius: BorderRadius.circular(AttendanceDesign.radiusSm + 2),
+            border: Border.all(
+              color: _stateBorderColor,
+              width: 1,
+            ),
           ),
           child: Icon(
             _getHeaderIcon(),
-            color: colorScheme.iconColor,
-            size: 24,
+            color: _stateColor,
+            size: 22,
           ),
         ),
-        const SizedBox(width: 20),
+        const SizedBox(width: AttendanceDesign.md - 2),
+
+        // Title + date
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 widget.statusTitle ?? "Attendance",
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                widget.currentDate ?? "Today",
                 style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.white.withOpacity(0.9),
-                  fontWeight: FontWeight.w500,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xFFF8FAFC)
+                      : AttendanceDesign.textPrimary,
+                  letterSpacing: -0.3,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 3),
+              Row(
+                children: [
+                  Icon(
+                    Icons.calendar_today_rounded,
+                    size: 11,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? const Color(0xFF64748B)
+                        : AttendanceDesign.textMuted,
+                  ),
+                  const SizedBox(width: 5),
+                  Flexible(
+                    child: Text(
+                      widget.currentDate ?? "Today",
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? const Color(0xFF94A3B8)
+                            : AttendanceDesign.textSecondary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
         ),
-        _buildStatusBadge(colorScheme),
+
+        const SizedBox(width: AttendanceDesign.sm),
+
+        // Status badge
+        _buildStatusBadge(),
       ],
     );
   }
 
-  Widget _buildStatusBadge(AttendanceColorScheme colorScheme) {
-    String badgeText;
-    IconData badgeIcon;
-
-    if (widget.isCheckedOut) {
-      badgeText = "Done";
-      badgeIcon = Icons.check_circle;
-    } else if (widget.isCheckedIn) {
-      if (widget.latenessMinutes != null && widget.latenessMinutes! > 0) {
-        badgeText = "Late";
-        badgeIcon = Icons.warning_rounded;
-      } else {
-        badgeText = "Active";
-        badgeIcon = Icons.timelapse_rounded;
-      }
-    } else {
-      badgeText = "Pending";
-      badgeIcon = Icons.schedule_rounded;
-    }
-
+  Widget _buildStatusBadge() {
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 600),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      duration: const Duration(milliseconds: 400),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AttendanceDesign.sm + 4,
+        vertical: AttendanceDesign.xs + 2,
+      ),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.95),
+        color: _stateSoftColor,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: colorScheme.accentColor.withOpacity(0.3),
-          width: 1.5,
-        ),
+        border: Border.all(color: _stateBorderColor, width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            badgeIcon,
-            color: colorScheme.accentColor,
-            size: 16,
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: _stateColor,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: _stateColor.withOpacity(0.5),
+                  blurRadius: 6,
+                  spreadRadius: 1,
+                ),
+              ],
+            ),
           ),
           const SizedBox(width: 6),
           Text(
-            badgeText,
+            _stateLabel,
             style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-              color: colorScheme.accentColor,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: _stateColor,
+              letterSpacing: 0.2,
             ),
           ),
         ],
@@ -338,70 +395,122 @@ class _AttendanceSummaryCardState extends State<AttendanceSummaryCard> {
   }
 
   IconData _getHeaderIcon() {
-    if (widget.isCheckedOut) {
-      return Icons.task_alt_rounded;
-    } else if (widget.isCheckedIn) {
-      return Icons.access_time_filled;
-    } else {
-      return Icons.schedule_rounded;
-    }
+    if (widget.isCheckedOut) return Icons.task_alt_rounded;
+    if (widget.isCheckedIn) return Icons.access_time_filled_rounded;
+    return Icons.schedule_rounded;
   }
 
-  Widget _buildContentBox(BuildContext context, AttendanceColorScheme colorScheme) {
+  Widget _buildDivider() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.95),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          _buildTimeInfoRow(),
-          const SizedBox(height: 16),
-          _buildStatusRow(),
-          if (_hasDeviceOrLocationInfo()) ...[
-            const SizedBox(height: 16),
-            _buildDeviceLocationRow(),
-          ],
-          const SizedBox(height: 20),
-          _buildActionButtons(context),
-        ],
-      ),
+      height: 1,
+      color: isDark ? const Color(0xFF2D3748) : AttendanceDesign.border,
     );
   }
 
+  // ===================== TIME INFO ROW =====================
+
   Widget _buildTimeInfoRow() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final mutedBg = isDark ? const Color(0xFF28334E) : AttendanceDesign.surfaceMuted;
+    final mutedBorder = isDark ? const Color(0xFF2D3748) : AttendanceDesign.border;
+
     return Row(
       children: [
         Expanded(
           child: _buildTimeInfo(
-            "Check-in",
+            "Check In",
             widget.checkInTime ?? "--:--",
             Icons.login_rounded,
-            widget.isCheckedIn ? Colors.green.shade400 : Colors.grey.shade400,
+            widget.isCheckedIn
+                ? AttendanceDesign.success
+                : (isDark ? const Color(0xFF64748B) : AttendanceDesign.textMuted),
+            widget.isCheckedIn
+                ? (isDark ? const Color(0xFF064E3B).withOpacity(0.3) : AttendanceDesign.successSoft)
+                : mutedBg,
+            widget.isCheckedIn
+                ? AttendanceDesign.successBorder
+                : mutedBorder,
           ),
         ),
-        const SizedBox(width: 16),
+        const SizedBox(width: AttendanceDesign.sm + 4),
         Expanded(
           child: _buildTimeInfo(
-            "Check-out",
+            "Check Out",
             widget.checkOutTime ?? "--:--",
             Icons.logout_rounded,
-            widget.isCheckedOut ? Colors.red.shade400 : Colors.grey.shade400,
+            widget.isCheckedOut
+                ? AttendanceDesign.danger
+                : (isDark ? const Color(0xFF64748B) : AttendanceDesign.textMuted),
+            widget.isCheckedOut
+                ? (isDark ? const Color(0xFF7F1D1D).withOpacity(0.3) : AttendanceDesign.dangerSoft)
+                : mutedBg,
+            widget.isCheckedOut
+                ? AttendanceDesign.dangerBorder
+                : mutedBorder,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildStatusRow() {
+  Widget _buildTimeInfo(
+      String title,
+      String value,
+      IconData icon,
+      Color color,
+      Color bgColor,
+      Color borderColor,
+      ) {
+    return Container(
+      padding: const EdgeInsets.all(AttendanceDesign.sm + 4),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(AttendanceDesign.radiusSm),
+        border: Border.all(color: borderColor, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color, size: 14),
+              const SizedBox(width: 6),
+              Text(
+                title,
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 11,
+                  color: color.withOpacity(0.85),
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AttendanceDesign.sm),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              color: (color == AttendanceDesign.textMuted || color == const Color(0xFF64748B))
+                  ? (Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xFF64748B)
+                      : AttendanceDesign.textMuted)
+                  : (Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xFFF8FAFC)
+                      : AttendanceDesign.textPrimary),
+              letterSpacing: -0.4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ===================== INFO CHIPS =====================
+
+  Widget _buildInfoChips() {
     return Row(
       children: [
         if (widget.currentWorkHours != null) ...[
@@ -409,11 +518,13 @@ class _AttendanceSummaryCardState extends State<AttendanceSummaryCard> {
             child: _buildInfoChip(
               "Work Time",
               _formatWorkHours(widget.currentWorkHours!),
-              Icons.access_time_rounded,
-              Colors.blue.shade400,
+              Icons.timer_outlined,
+              AttendanceDesign.info,
+              AttendanceDesign.infoSoft,
+              AttendanceDesign.infoBorder,
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AttendanceDesign.sm),
         ],
         Expanded(
           child: _buildInfoChip(
@@ -421,246 +532,64 @@ class _AttendanceSummaryCardState extends State<AttendanceSummaryCard> {
             _getStatusText(),
             _getStatusIcon(),
             _getStatusColor(),
+            _getStatusBgColor(),
+            _getStatusBorderColor(),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildDeviceLocationRow() {
-    return Column(
-      children: [
-        if (widget.deviceModel != null)
-          _buildInfoChip(
-            "Device",
-            "${widget.deviceOS ?? ''} | ${widget.deviceModel ?? ''}",
-            Icons.phone_android_rounded,
-            Colors.purple.shade400,
-          ),
-        if (widget.deviceModel != null && widget.deviceLocation != null)
-          const SizedBox(height: 12),
-        if (widget.deviceLocation != null)
-          _buildInfoChip(
-            "Location",
-            widget.deviceLocation!,
-            Icons.location_on_rounded,
-            Colors.teal.shade400,
-          ),
-      ],
-    );
-  }
-
-  Widget _buildActionButtons(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildCheckInButton(),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildCheckOutButton(),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCheckInButton() {
-    final bool canCheckIn = !widget.isCheckedIn && !widget.isLoading && !_isAuthenticating;
-    final bool showLoading = (widget.isLoading && !widget.isCheckedIn) ||
-        (_isAuthenticating && !widget.isCheckedIn);
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: canCheckIn ? _handleCheckIn : null,
-        borderRadius: BorderRadius.circular(16),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-          decoration: BoxDecoration(
-            gradient: canCheckIn
-                ? LinearGradient(
-              colors: [Colors.green.shade400, Colors.green.shade600],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            )
-                : LinearGradient(
-              colors: [Colors.grey.shade300, Colors.grey.shade400],
-            ),
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: canCheckIn
-                ? [
-              BoxShadow(
-                color: Colors.green.shade300.withOpacity(0.5),
-                blurRadius: 12,
-                offset: const Offset(0, 6),
-              ),
-            ]
-                : [],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (showLoading)
-                const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                )
-              else
-                Icon(
-                  widget.isCheckedIn ? Icons.check_circle : Icons.fingerprint,
-                  color: Colors.white,
-                  size: 22,
-                ),
-              const SizedBox(width: 8),
-              Text(
-                widget.isCheckedIn ? "Checked In" : "Check In",
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCheckOutButton() {
-    final bool canCheckOut = widget.isCheckedIn && !widget.isCheckedOut &&
-        !widget.isLoading && !_isAuthenticating;
-    final bool showLoading = (widget.isLoading && widget.isCheckedIn && !widget.isCheckedOut) ||
-        (_isAuthenticating && widget.isCheckedIn);
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: canCheckOut ? _handleCheckOut : null,
-        borderRadius: BorderRadius.circular(16),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-          decoration: BoxDecoration(
-            gradient: canCheckOut
-                ? LinearGradient(
-              colors: [Colors.red.shade400, Colors.red.shade600],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            )
-                : LinearGradient(
-              colors: [Colors.grey.shade300, Colors.grey.shade400],
-            ),
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: canCheckOut
-                ? [
-              BoxShadow(
-                color: Colors.red.shade300.withOpacity(0.5),
-                blurRadius: 12,
-                offset: const Offset(0, 6),
-              ),
-            ]
-                : [],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (showLoading)
-                const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                )
-              else
-                Icon(
-                  widget.isCheckedOut ? Icons.check_circle : Icons.fingerprint,
-                  color: Colors.white,
-                  size: 22,
-                ),
-              const SizedBox(width: 8),
-              Text(
-                widget.isCheckedOut ? "Checked Out" : "Check Out",
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTimeInfo(String title, String value, IconData icon, Color color) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(icon, color: color, size: 18),
-            const SizedBox(width: 6),
-            Text(
-              title,
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
-                color: Colors.black54,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: color == Colors.grey.shade400 ? Colors.black38 : Colors.black87,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildInfoChip(String title, String value, IconData icon, Color color) {
+  Widget _buildInfoChip(
+      String title,
+      String value,
+      IconData icon,
+      Color color,
+      Color bgColor,
+      Color borderColor,
+      ) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AttendanceDesign.sm + 4,
+        vertical: AttendanceDesign.sm + 2,
+      ),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.2)),
+        color: bgColor,
+        borderRadius: BorderRadius.circular(AttendanceDesign.radiusSm),
+        border: Border.all(color: borderColor, width: 1),
       ),
       child: Row(
         children: [
-          Icon(icon, color: color, size: 18),
-          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: color, size: 14),
+          ),
+          const SizedBox(width: AttendanceDesign.sm),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Colors.black54,
+                  title.toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    color: color.withOpacity(0.75),
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.6,
                   ),
                 ),
+                const SizedBox(height: 2),
                 Text(
                   value,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: color,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AttendanceDesign.textPrimary,
+                    letterSpacing: -0.2,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -672,7 +601,253 @@ class _AttendanceSummaryCardState extends State<AttendanceSummaryCard> {
     );
   }
 
-  bool _hasDeviceOrLocationInfo() => widget.deviceModel != null || widget.deviceLocation != null;
+  // ===================== DEVICE & LOCATION =====================
+
+  Widget _buildDeviceLocationSection() {
+    return Column(
+      children: [
+        if (widget.deviceModel != null)
+          _buildDetailRow(
+            icon: Icons.smartphone_rounded,
+            label: "Device",
+            value: "${widget.deviceOS ?? ''} · ${widget.deviceModel ?? ''}",
+            color: AttendanceDesign.purple,
+            bgColor: AttendanceDesign.purpleSoft,
+            borderColor: AttendanceDesign.purpleBorder,
+          ),
+        if (widget.deviceModel != null && widget.deviceLocation != null)
+          const SizedBox(height: AttendanceDesign.sm),
+        if (widget.deviceLocation != null)
+          _buildDetailRow(
+            icon: Icons.location_on_rounded,
+            label: "Location",
+            value: widget.deviceLocation!,
+            color: AttendanceDesign.teal,
+            bgColor: AttendanceDesign.tealSoft,
+            borderColor: AttendanceDesign.tealBorder,
+          ),
+      ],
+    );
+  }
+
+  Widget _buildDetailRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+    required Color bgColor,
+    required Color borderColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AttendanceDesign.sm + 4,
+        vertical: AttendanceDesign.sm + 2,
+      ),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(AttendanceDesign.radiusSm),
+        border: Border.all(color: borderColor, width: 1),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: color, size: 14),
+          ),
+          const SizedBox(width: AttendanceDesign.sm + 2),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label.toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    color: color.withOpacity(0.75),
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: AttendanceDesign.textPrimary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ===================== ACTION BUTTONS =====================
+
+  Widget _buildActionButtons() {
+    return Row(
+      children: [
+        Expanded(child: _buildCheckInButton()),
+        const SizedBox(width: AttendanceDesign.sm + 4),
+        Expanded(child: _buildCheckOutButton()),
+      ],
+    );
+  }
+
+  Widget _buildCheckInButton() {
+    final bool canCheckIn =
+        !widget.isCheckedIn && !widget.isLoading && !_isAuthenticating;
+    final bool showLoading = (widget.isLoading && !widget.isCheckedIn) ||
+        (_isAuthenticating && !widget.isCheckedIn);
+    final bool isDone = widget.isCheckedIn;
+
+    return _buildActionButton(
+      label: isDone ? "Checked In" : "Check In",
+      icon: isDone ? Icons.check_circle_rounded : Icons.fingerprint_rounded,
+      isEnabled: canCheckIn,
+      isLoading: showLoading,
+      isCompleted: isDone,
+      color: AttendanceDesign.success,
+      softColor: AttendanceDesign.successSoft,
+      borderColor: AttendanceDesign.successBorder,
+      onTap: canCheckIn ? _handleCheckIn : null,
+    );
+  }
+
+  Widget _buildCheckOutButton() {
+    final bool canCheckOut = widget.isCheckedIn &&
+        !widget.isCheckedOut &&
+        !widget.isLoading &&
+        !_isAuthenticating;
+    final bool showLoading = (widget.isLoading &&
+        widget.isCheckedIn &&
+        !widget.isCheckedOut) ||
+        (_isAuthenticating && widget.isCheckedIn);
+    final bool isDone = widget.isCheckedOut;
+
+    return _buildActionButton(
+      label: isDone ? "Checked Out" : "Check Out",
+      icon: isDone ? Icons.check_circle_rounded : Icons.fingerprint_rounded,
+      isEnabled: canCheckOut,
+      isLoading: showLoading,
+      isCompleted: isDone,
+      color: AttendanceDesign.danger,
+      softColor: AttendanceDesign.dangerSoft,
+      borderColor: AttendanceDesign.dangerBorder,
+      onTap: canCheckOut ? _handleCheckOut : null,
+    );
+  }
+
+  Widget _buildActionButton({
+    required String label,
+    required IconData icon,
+    required bool isEnabled,
+    required bool isLoading,
+    required bool isCompleted,
+    required Color color,
+    required Color softColor,
+    required Color borderColor,
+    required VoidCallback? onTap,
+  }) {
+    // Filled gradient button when enabled or completed
+    final bool isFilled = isEnabled || isCompleted;
+
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(AttendanceDesign.radiusSm + 2),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AttendanceDesign.radiusSm + 2),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(
+            vertical: AttendanceDesign.sm + 6,
+            horizontal: AttendanceDesign.sm,
+          ),
+          decoration: BoxDecoration(
+            gradient: isFilled
+                ? LinearGradient(
+              colors: [
+                color,
+                color.withOpacity(0.85),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            )
+                : null,
+            color: isFilled ? null : AttendanceDesign.surfaceMuted,
+            borderRadius: BorderRadius.circular(AttendanceDesign.radiusSm + 2),
+            border: Border.all(
+              color: isFilled ? Colors.transparent : AttendanceDesign.border,
+              width: 1,
+            ),
+            boxShadow: isEnabled
+                ? [
+              BoxShadow(
+                color: color.withOpacity(0.3),
+                blurRadius: 14,
+                offset: const Offset(0, 6),
+                spreadRadius: -4,
+              ),
+            ]
+                : [],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (isLoading)
+                SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      isFilled ? Colors.white : color,
+                    ),
+                  ),
+                )
+              else
+                Icon(
+                  icon,
+                  color: isFilled ? Colors.white : AttendanceDesign.textMuted,
+                  size: 18,
+                ),
+              const SizedBox(width: AttendanceDesign.sm),
+              Flexible(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color:
+                    isFilled ? Colors.white : AttendanceDesign.textMuted,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.2,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===================== HELPERS =====================
+
+  bool _hasDeviceOrLocationInfo() =>
+      widget.deviceModel != null || widget.deviceLocation != null;
 
   String _getStatusText() {
     if (widget.latenessMinutes != null && widget.latenessMinutes! > 0) {
@@ -683,14 +858,26 @@ class _AttendanceSummaryCardState extends State<AttendanceSummaryCard> {
 
   IconData _getStatusIcon() {
     return (widget.latenessMinutes != null && widget.latenessMinutes! > 0)
-        ? Icons.warning_rounded
-        : Icons.check_circle_rounded;
+        ? Icons.warning_amber_rounded
+        : Icons.check_circle_outline_rounded;
   }
 
   Color _getStatusColor() {
     return (widget.latenessMinutes != null && widget.latenessMinutes! > 0)
-        ? Colors.orange.shade400
-        : Colors.green.shade400;
+        ? AttendanceDesign.warning
+        : AttendanceDesign.success;
+  }
+
+  Color _getStatusBgColor() {
+    return (widget.latenessMinutes != null && widget.latenessMinutes! > 0)
+        ? AttendanceDesign.warningSoft
+        : AttendanceDesign.successSoft;
+  }
+
+  Color _getStatusBorderColor() {
+    return (widget.latenessMinutes != null && widget.latenessMinutes! > 0)
+        ? AttendanceDesign.warningBorder
+        : AttendanceDesign.successBorder;
   }
 
   String _formatWorkHours(double hours) {
@@ -704,20 +891,10 @@ class _AttendanceSummaryCardState extends State<AttendanceSummaryCard> {
     final remainingMinutes = (mins % 60).round();
     return hours > 0
         ? "${hours}h ${remainingMinutes}m late"
-        : "${remainingMinutes.toInt()} mins late";
+        : "${remainingMinutes.toInt()}m late";
   }
 }
 
-class AttendanceColorScheme {
-  final List<Color> primaryGradient;
-  final Color shadowColor;
-  final Color iconColor;
-  final Color accentColor;
+// ===================== ATTENDANCE STATE =====================
 
-  AttendanceColorScheme({
-    required this.primaryGradient,
-    required this.shadowColor,
-    required this.iconColor,
-    required this.accentColor,
-  });
-}
+enum _AttendanceState { pending, active, late, completed }

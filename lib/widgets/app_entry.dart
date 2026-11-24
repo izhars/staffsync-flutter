@@ -2,20 +2,23 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:firebase_messaging/firebase_messaging.dart';
-
 import '../app/constants.dart';
-import '../component/test.dart';
-import '../main.dart';
+import '../core/navigation.dart';
 import '../models/user.dart';
-import '../screens/SnapchatLoginScreen.dart';
+import '../screens/snapchat_login_screen.dart';
 import '../services/auth_service.dart';
 import '../screens/dashboard/dashboard_screen.dart';
 import '../services/notification_service.dart';
 
 class AppEntry extends StatefulWidget {
   final Map<String, dynamic>? initialNotificationData;
+  final bool isFromNotification;
 
-  const AppEntry({Key? key, this.initialNotificationData}) : super(key: key);
+  const AppEntry({
+    Key? key,
+    this.initialNotificationData,
+    required this.isFromNotification,
+  }) : super(key: key);
 
   @override
   State<AppEntry> createState() => _AppEntryState();
@@ -27,35 +30,21 @@ class _AppEntryState extends State<AppEntry> with WidgetsBindingObserver {
   bool _isLoading = true;
   bool _isLoggedIn = false;
   bool _isVerified = false;
-  bool _hasNavigatedFromNotification = false; // Track if we've navigated
+  bool _hasNavigatedFromNotification = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-
     _checkLoginStatus();
     _initNotifications();
   }
 
   void _initNotifications() {
-    // 🔔 Foreground notifications
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      final notification = message.notification;
-
-      if (notification != null) {
-        NotificationService.show(
-          title: notification.title ?? 'Notification',
-          body: notification.body ?? '',
-        );
-      }
-    });
-
-    // 👉 App opened from background via notification
-    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      debugPrint("👉 Notification clicked: ${message.data}");
-      _handleNotificationNavigation(message.data);
-    });
+    // ✅ FCM foreground & onMessageOpenedApp listeners are handled
+    // centrally in NotificationService.init() — no duplicate listeners here.
+    // See notification_service.dart _setupFirebaseListeners().
+    debugPrint('🔔 [AppEntry] Notification handling delegated to NotificationService');
   }
 
   Future<void> _checkLoginStatus() async {
@@ -117,7 +106,9 @@ class _AppEntryState extends State<AppEntry> with WidgetsBindingObserver {
         });
 
         // AFTER login check, handle initial notification if exists
-        if (widget.initialNotificationData != null && !_hasNavigatedFromNotification) {
+        if (widget.initialNotificationData != null &&
+            !_hasNavigatedFromNotification &&
+            widget.isFromNotification) {
           _handleInitialNotification();
         }
       } else if (response.statusCode == 403) {
@@ -143,7 +134,10 @@ class _AppEntryState extends State<AppEntry> with WidgetsBindingObserver {
   }
 
   void _handleInitialNotification() {
-    if (widget.initialNotificationData != null && _isLoggedIn && _isVerified) {
+    if (widget.initialNotificationData != null &&
+        _isLoggedIn &&
+        _isVerified &&
+        !_hasNavigatedFromNotification) {
       _hasNavigatedFromNotification = true;
 
       // Add a small delay to ensure navigation works properly
@@ -156,16 +150,28 @@ class _AppEntryState extends State<AppEntry> with WidgetsBindingObserver {
   void _handleNotificationNavigation(Map<String, dynamic> data) {
     final type = data['type'];
 
+    debugPrint('📱 AppEntry handling notification: $type');
+
     switch (type) {
-      case 'test_notification':
-        final firedAt = data['firedAt'] ?? '';
-        navigatorKey.currentState?.pushAndRemoveUntil(
-          MaterialPageRoute(
-            builder: (_) => TestScreen(firedAt: firedAt),
+      case 'incoming_call':
+        debugPrint('📞 Call notification handled in main.dart');
+        break;
+
+      case 'employee_interaction':
+        final senderName = data['senderName'] ?? 'Someone';
+        final interactionType = data['interactionType'] ?? 'interacted';
+
+        ScaffoldMessenger.of(navigatorKey.currentContext!).showSnackBar(
+          SnackBar(
+            content: Text('$senderName $interactionType'),
+            backgroundColor: Colors.blue,
+            duration: Duration(seconds: 3),
           ),
-              (route) => false, // Clear all previous routes
         );
         break;
+
+      default:
+        debugPrint('Unknown notification type: $type');
     }
   }
 
@@ -196,6 +202,21 @@ class _AppEntryState extends State<AppEntry> with WidgetsBindingObserver {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+
+    if (state == AppLifecycleState.resumed) {
+      // Check for pending notifications when app resumes
+      FirebaseMessaging.instance.getInitialMessage().then((message) {
+        if (message != null && !_hasNavigatedFromNotification) {
+          _handleNotificationNavigation(message.data);
+          _hasNavigatedFromNotification = true;
+        }
+      });
+    }
+  }
+
+  @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
@@ -218,8 +239,6 @@ class _AppEntryState extends State<AppEntry> with WidgetsBindingObserver {
       );
     }
 
-    // If we have initial notification and user is logged in,
-    // we'll navigate from initState, so just show dashboard temporarily
     return _isLoggedIn && _isVerified
         ? const DashboardScreen()
         : SnapchatLoginScreen();

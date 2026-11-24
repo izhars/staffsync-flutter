@@ -1,17 +1,20 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../services/avatar_api.dart';
+import '../widgets/route_observer.dart';
 
 class TopBar extends StatefulWidget implements PreferredSizeWidget {
   final String address;
   final bool isLoadingAddress;
-  final VoidCallback? onAvatarTap;   // <-- NEW
+  final VoidCallback? onAvatarTap;
+  final String? avatarUrl;
 
   const TopBar({
     super.key,
     required this.address,
     this.isLoadingAddress = false,
     this.onAvatarTap,
+    this.avatarUrl,
   });
 
   @override
@@ -21,9 +24,11 @@ class TopBar extends StatefulWidget implements PreferredSizeWidget {
   Size get preferredSize => const Size.fromHeight(80);
 }
 
-class _TopBarState extends State<TopBar> {
+class _TopBarState extends State<TopBar> with RouteAware {
   File? _avatar;
   bool _isLoadingAvatar = false;
+  bool _hasLocalAvatar = false;
+  bool _isSubscribed = false;
 
   @override
   void initState() {
@@ -31,31 +36,95 @@ class _TopBarState extends State<TopBar> {
     _loadAvatar();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Subscribe to route events so we know when a pushed screen
+    // (e.g. ProfileScreen) is popped back to us.
+    if (!_isSubscribed) {
+      final route = ModalRoute.of(context);
+      if (route is ModalRoute<void>) {
+        routeObserver.subscribe(this, route);
+        _isSubscribed = true;
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    if (_isSubscribed) {
+      routeObserver.unsubscribe(this);
+      _isSubscribed = false;
+    }
+    super.dispose();
+  }
+
+  /// Called when the route *above* this one was popped and we're
+  /// now the topmost route again. This is our trigger to reload
+  /// the avatar (profile update flow hits exactly this).
+  @override
+  void didPopNext() {
+    _loadAvatar();
+  }
+
   Future<void> _loadAvatar() async {
     try {
-      setState(() => _isLoadingAvatar = true);
-      final avatar = await AvatarService.getAvatar();
-      if (mounted) {
+      if (mounted) setState(() => _isLoadingAvatar = true);
+
+      final hasLocal = await AvatarService.hasLocalAvatar();
+
+      if (hasLocal) {
+        final localAvatar = await AvatarService.getAvatar();
+        if (!mounted) return;
         setState(() {
-          _avatar = avatar;
+          _avatar = localAvatar;
+          _hasLocalAvatar = localAvatar != null;
+          _isLoadingAvatar = false;
+        });
+      } else {
+        if (!mounted) return;
+        setState(() {
+          _avatar = null;
+          _hasLocalAvatar = false;
           _isLoadingAvatar = false;
         });
       }
     } catch (e) {
-      if (mounted) {
-        setState(() => _isLoadingAvatar = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load avatar: $e')),
-        );
+      debugPrint('Error loading avatar in TopBar: $e');
+      if (!mounted) return;
+      setState(() {
+        _isLoadingAvatar = false;
+        _hasLocalAvatar = false;
+      });
+    }
+  }
+
+  // Helper method to get the profile image
+  ImageProvider? _getProfileImage() {
+    // Priority 1: local image if available
+    if (_hasLocalAvatar && _avatar != null) {
+      try {
+        return FileImage(_avatar!);
+      } catch (e) {
+        debugPrint('Error loading local avatar in TopBar: $e');
       }
     }
+
+    // Priority 2: network image
+    if (widget.avatarUrl != null && widget.avatarUrl!.isNotEmpty) {
+      return NetworkImage(widget.avatarUrl!);
+    }
+
+    // Priority 3: default asset
+    return const AssetImage('assets/profile.png');
   }
 
   List<String> _splitAddress(String address) {
     final parts = address.split(',');
     if (parts.isEmpty) return ['', ''];
     final firstPart = parts[0].trim();
-    final restParts = parts.length > 1 ? parts.sublist(1).join(',').trim() : '';
+    final restParts =
+    parts.length > 1 ? parts.sublist(1).join(',').trim() : '';
     return [firstPart, restParts];
   }
 
@@ -94,20 +163,27 @@ class _TopBarState extends State<TopBar> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surface = isDark ? const Color(0xFF1E2640) : Colors.white;
+    final textPrimary = isDark ? const Color(0xFFF8FAFC) : Colors.black87;
+    final textSecondary = isDark ? const Color(0xFF94A3B8) : Colors.grey[600];
+
     final addressParts = _splitAddress(widget.address);
     final firstPart = addressParts[0];
     final restPart = addressParts[1];
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: surface,
+        boxShadow: isDark
+            ? []
+            : [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
       child: SafeArea(
         bottom: false,
@@ -115,9 +191,10 @@ class _TopBarState extends State<TopBar> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Row(
             children: [
-              // ---- AVATAR (now also navigates to profile) ----
+              // ---- AVATAR with local image priority ----
               GestureDetector(
-                onTap: widget.onAvatarTap ?? () => Scaffold.of(context).openDrawer(),
+                onTap: widget.onAvatarTap ??
+                        () => Scaffold.of(context).openDrawer(),
                 child: Container(
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
@@ -148,11 +225,20 @@ class _TopBarState extends State<TopBar> {
                     backgroundColor: Colors.grey[100],
                     child: CircleAvatar(
                       radius: 20,
-                      backgroundImage: _avatar != null
-                          ? FileImage(_avatar!)
-                          : const AssetImage('assets/profile.png')
-                      as ImageProvider,
-                      onBackgroundImageError: (_, __) => setState(() => _avatar = null),
+                      backgroundImage: _getProfileImage(),
+                      // Fallback to initials
+                      child: _hasLocalAvatar == false &&
+                          (widget.avatarUrl == null ||
+                              widget.avatarUrl!.isEmpty)
+                          ? Text(
+                        'U',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue[700],
+                        ),
+                      )
+                          : null,
                     ),
                   ),
                 ),
@@ -160,7 +246,7 @@ class _TopBarState extends State<TopBar> {
 
               const SizedBox(width: 14),
 
-              // ---- ADDRESS + LOCATION ICON (unchanged) ----
+              // ---- ADDRESS + LOCATION ICON ----
               Expanded(
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.end,
@@ -171,9 +257,11 @@ class _TopBarState extends State<TopBar> {
                         crossAxisAlignment: CrossAxisAlignment.end,
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          _buildSkeleton(width: 120, height: 18, borderRadius: 4),
+                          _buildSkeleton(
+                              width: 120, height: 18, borderRadius: 4),
                           const SizedBox(height: 6),
-                          _buildSkeleton(width: 180, height: 14, borderRadius: 4),
+                          _buildSkeleton(
+                              width: 180, height: 14, borderRadius: 4),
                         ],
                       )
                           : Column(
@@ -183,8 +271,8 @@ class _TopBarState extends State<TopBar> {
                           if (firstPart.isNotEmpty)
                             Text(
                               firstPart,
-                              style: const TextStyle(
-                                color: Colors.black87,
+                              style: TextStyle(
+                                color: textPrimary,
                                 fontWeight: FontWeight.w700,
                                 fontSize: 17,
                                 letterSpacing: -0.5,
@@ -199,7 +287,7 @@ class _TopBarState extends State<TopBar> {
                             Text(
                               restPart,
                               style: TextStyle(
-                                color: Colors.grey[600],
+                                color: textSecondary,
                                 fontWeight: FontWeight.w400,
                                 fontSize: 13,
                                 height: 1.3,

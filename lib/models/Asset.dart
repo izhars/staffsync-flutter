@@ -69,33 +69,36 @@ class Asset {
   });
 
   factory Asset.fromJson(Map<String, dynamic> json) {
-    // Parse assignment history
     final List<dynamic> historyJson = json['assignmentHistory'] ?? [];
     final assignmentHistory = historyJson
-        .map((record) => AssignmentRecord.fromJson(record))
+        .map((record) => AssignmentRecord.fromJson(record as Map<String, dynamic>))
         .toList();
 
     return Asset(
-      id: json['_id'],
+      id: json['_id']?.toString() ?? '',
       assetId: json['assetId']?.toString().trim() ?? '',
-      name: json['name'],
-      category: json['category'],
-      brand: json['brand'],
-      model: json['model'],
-      purchaseDate: DateTime.parse(json['purchaseDate']),
-      purchasePrice: json['purchasePrice'] is int
-          ? (json['purchasePrice'] as int).toDouble()
-          : json['purchasePrice'].toDouble(),
-      status: json['status'],
-      condition: json['condition'],
+      name: json['name']?.toString() ?? 'Unknown',
+      category: json['category']?.toString() ?? 'other',
+      brand: json['brand']?.toString(),
+      model: json['model']?.toString(),
+      purchaseDate: json['purchaseDate'] != null
+          ? DateTime.parse(json['purchaseDate'])
+          : DateTime.now(),
+      purchasePrice: (json['purchasePrice'] as num?)?.toDouble() ?? 0.0,
+      status: json['status']?.toString() ?? 'unknown',
+      condition: json['condition']?.toString() ?? 'unknown',
       assignedDate: json['assignedDate'] != null
           ? DateTime.parse(json['assignedDate'])
           : null,
-      assignedTo: json['assignedTo'],
-      createdAt: DateTime.parse(json['createdAt']),
-      updatedAt: DateTime.parse(json['updatedAt']),
-      assignmentHistory: assignmentHistory, // Add this
-      location: json['location'], // Add location
+      assignedTo: json['assignedTo']?.toString(),
+      createdAt: json['createdAt'] != null
+          ? DateTime.parse(json['createdAt'])
+          : DateTime.now(),
+      updatedAt: json['updatedAt'] != null
+          ? DateTime.parse(json['updatedAt'])
+          : DateTime.now(),
+      assignmentHistory: assignmentHistory,
+      location: json['location']?.toString(),
     );
   }
 

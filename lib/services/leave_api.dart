@@ -1,6 +1,5 @@
 import '../app/constants.dart';
 import 'network_service.dart';
-import 'api_exception.dart';
 
 class LeavesService {
   final NetworkService _network = NetworkService();

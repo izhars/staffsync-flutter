@@ -1,7 +1,72 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:skeletonizer/skeletonizer.dart';
-import '../services/PollService.dart';
+import '../services/poll_service.dart';
 import 'poll_results_screen.dart';
+
+// ===================== SHARED DESIGN TOKENS =====================
+class PollDesign {
+  static const double xs = 4;
+  static const double sm = 8;
+  static const double md = 16;
+  static const double lg = 24;
+  static const double xl = 32;
+
+  static const double radiusSm = 10;
+  static const double radiusMd = 14;
+  static const double radiusLg = 20;
+  static const double radiusXl = 24;
+
+  // Primary indigo palette
+  static const Color primary = Color(0xFF4F46E5);       // indigo-600
+  static const Color primaryDark = Color(0xFF4338CA);   // indigo-700
+  static const Color primarySoft = Color(0xFFEEF2FF);   // indigo-50
+  static const Color primaryLight = Color(0xFFC7D2FE);  // indigo-200
+
+  static const Color surface = Colors.white;
+  static const Color surfaceMuted = Color(0xFFF8FAFC);
+  static const Color bg = Color(0xFFF6F7FB);
+  static const Color border = Color(0xFFEAECEF);
+
+  static const Color textPrimary = Color(0xFF1A1D26);
+  static const Color textSecondary = Color(0xFF6B7280);
+  static const Color textMuted = Color(0xFF9CA3AF);
+
+  // Semantic
+  static const Color success = Color(0xFF059669);
+  static const Color successSoft = Color(0xFFECFDF5);
+  static const Color successBorder = Color(0xFFA7F3D0);
+
+  static const Color warning = Color(0xFFD97706);
+  static const Color warningSoft = Color(0xFFFFFBEB);
+  static const Color warningBorder = Color(0xFFFDE68A);
+
+  static const Color danger = Color(0xFFDC2626);
+  static const Color dangerSoft = Color(0xFFFEF2F2);
+  static const Color dangerBorder = Color(0xFFFECACA);
+
+  static const Color neutral = Color(0xFF6B7280);
+  static const Color neutralSoft = Color(0xFFF3F4F6);
+  static const Color neutralBorder = Color(0xFFE5E7EB);
+
+  static List<BoxShadow> get softShadow => [
+    BoxShadow(
+      color: Colors.black.withOpacity(0.04),
+      blurRadius: 14,
+      offset: const Offset(0, 4),
+      spreadRadius: -2,
+    ),
+  ];
+
+  static List<BoxShadow> get cardShadow => [
+    BoxShadow(
+      color: Colors.black.withOpacity(0.06),
+      blurRadius: 22,
+      offset: const Offset(0, 8),
+      spreadRadius: -6,
+    ),
+  ];
+}
 
 class PollScreen extends StatefulWidget {
   const PollScreen({Key? key}) : super(key: key);
@@ -41,13 +106,15 @@ class _PollScreenState extends State<PollScreen>
     try {
       setState(() => _loading = true);
       final polls = await _pollService.fetchPolls();
+      if (!mounted) return;
       setState(() {
         _polls = polls;
         _loading = false;
       });
-      _animationController.forward();
+      _animationController.forward(from: 0);
     } catch (e) {
       debugPrint('Error fetching polls: $e');
+      if (!mounted) return;
       setState(() => _loading = false);
       _showErrorSnackBar('Failed to load polls');
     }
@@ -56,9 +123,12 @@ class _PollScreenState extends State<PollScreen>
   Future<void> _vote(String pollId, int optionIndex) async {
     try {
       final result = await _pollService.votePoll(pollId, optionIndex);
+      if (!mounted) return;
       if (result['success'] == true) {
-        _showSuccessSnackBar(result['message'] ?? 'Vote recorded successfully');
-        await _fetchPolls(); // Refresh polls
+        _showSuccessSnackBar(
+          result['message'] ?? 'Vote recorded successfully',
+        );
+        await _fetchPolls();
       }
     } catch (e) {
       debugPrint('Vote error: $e');
@@ -66,148 +136,81 @@ class _PollScreenState extends State<PollScreen>
     }
   }
 
+  // ===================== SNACKBARS =====================
+
   void _showSuccessSnackBar(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
           children: [
-            const Icon(Icons.check_circle, color: Colors.white),
-            const SizedBox(width: 12),
-            Expanded(child: Text(message)),
+            const Icon(
+              Icons.check_circle_rounded,
+              color: Colors.white,
+              size: 18,
+            ),
+            const SizedBox(width: PollDesign.sm + 2),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
           ],
         ),
-        backgroundColor: Colors.green,
+        backgroundColor: PollDesign.success,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(PollDesign.radiusSm),
+        ),
+        margin: const EdgeInsets.all(PollDesign.md),
       ),
     );
   }
 
   void _showErrorSnackBar(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
           children: [
-            const Icon(Icons.error_outline, color: Colors.white),
-            const SizedBox(width: 12),
-            Expanded(child: Text(message)),
+            const Icon(
+              Icons.error_outline_rounded,
+              color: Colors.white,
+              size: 18,
+            ),
+            const SizedBox(width: PollDesign.sm + 2),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
           ],
         ),
-        backgroundColor: Colors.red,
+        backgroundColor: PollDesign.danger,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(PollDesign.radiusSm),
+        ),
+        margin: const EdgeInsets.all(PollDesign.md),
       ),
     );
   }
+
+  // ===================== BUILD =====================
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
-      appBar: AppBar(
-        title: const Text(
-          'Community Polls',
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 24,
-          ),
-        ),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
-        elevation: 0,
-        centerTitle: true,
-        bottom: const PreferredSize(
-          preferredSize: Size.fromHeight(1),
-          child: Divider(height: 1, color: Color(0xFFE0E0E0)),
-        ),
-      ),
-      body: _loading ? _buildSkeletonLoading() : _buildContent(),
-    );
-  }
-
-  Widget _buildSkeletonLoading() {
-    return Skeletonizer(
-      enabled: true,
-      child: ListView.separated(
-        padding: const EdgeInsets.all(16),
-        itemCount: 3, // Show 3 skeleton items
-        separatorBuilder: (context, index) => const SizedBox(height: 16),
-        itemBuilder: (context, index) => _buildSkeletonPollCard(),
-      ),
-    );
-  }
-
-  Widget _buildSkeletonPollCard() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: const Padding(
-        padding: EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        backgroundColor: PollDesign.bg,
+        body: Column(
           children: [
-            // Header skeleton
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                CircleAvatar(
-                  radius: 14,
-                  backgroundColor: Colors.grey,
-                ),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'This is a skeleton question that will be replaced',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        'Expires: 2d left',
-                        style: TextStyle(
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 16),
-            // Options skeleton
-            Column(
-              children: [
-                _SkeletonOption(),
-                SizedBox(height: 12),
-                _SkeletonOption(),
-                SizedBox(height: 12),
-                _SkeletonOption(),
-              ],
-            ),
-            SizedBox(height: 16),
-            // Footer skeleton
-            Row(
-              children: [
-                Icon(Icons.how_to_vote, size: 16),
-                SizedBox(width: 6),
-                Text('0 votes'),
-                Spacer(),
-                Text('Active'),
-              ],
+            _buildHeader(),
+            Expanded(
+              child: _loading ? _buildSkeletonLoading() : _buildContent(),
             ),
           ],
         ),
@@ -215,58 +218,310 @@ class _PollScreenState extends State<PollScreen>
     );
   }
 
+  // ===================== HEADER =====================
+
+  Widget _buildHeader() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [PollDesign.primary, PollDesign.primaryDark],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: const BorderRadius.vertical(
+          bottom: Radius.circular(PollDesign.radiusXl),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: PollDesign.primary.withOpacity(0.25),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+            spreadRadius: -6,
+          ),
+        ],
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            PollDesign.md,
+            PollDesign.sm,
+            PollDesign.md,
+            PollDesign.md,
+          ),
+          child: Row(
+            children: [
+              Material(
+                color: Colors.white.withOpacity(0.15),
+                borderRadius:
+                BorderRadius.circular(PollDesign.radiusSm),
+                child: InkWell(
+                  borderRadius:
+                  BorderRadius.circular(PollDesign.radiusSm),
+                  onTap: () => Navigator.pop(context),
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    alignment: Alignment.center,
+                    child: const Icon(
+                      Icons.arrow_back_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: PollDesign.sm + 4),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Community Polls',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        letterSpacing: -0.4,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Share your opinion with the team',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: Colors.white70,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Material(
+                color: Colors.white.withOpacity(0.15),
+                borderRadius:
+                BorderRadius.circular(PollDesign.radiusSm),
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  alignment: Alignment.center,
+                  child: const Icon(
+                    Icons.how_to_vote_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===================== CONTENT =====================
+
   Widget _buildContent() {
-    if (_polls.isEmpty) {
-      return _buildEmptyState();
-    }
+    if (_polls.isEmpty) return _buildEmptyState();
 
     return FadeTransition(
       opacity: _fadeAnimation,
       child: RefreshIndicator(
         onRefresh: _fetchPolls,
-        color: Colors.indigo,
-        backgroundColor: Colors.white,
+        color: PollDesign.primary,
+        backgroundColor: PollDesign.surface,
         child: ListView.separated(
-          padding: const EdgeInsets.all(16),
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(
+            PollDesign.md,
+            PollDesign.md,
+            PollDesign.md,
+            PollDesign.xl,
+          ),
           itemCount: _polls.length,
-          separatorBuilder: (context, index) => const SizedBox(height: 16),
+          separatorBuilder: (_, __) =>
+          const SizedBox(height: PollDesign.sm + 4),
           itemBuilder: (context, index) => _buildPollCard(_polls[index]),
         ),
       ),
     );
   }
 
+  // ===================== EMPTY =====================
+
   Widget _buildEmptyState() {
     return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(PollDesign.xl),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 96,
+              height: 96,
+              decoration: const BoxDecoration(
+                color: PollDesign.primarySoft,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.poll_outlined,
+                size: 42,
+                color: PollDesign.primary,
+              ),
+            ),
+            const SizedBox(height: PollDesign.lg),
+            const Text(
+              'No Polls Available',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: PollDesign.textPrimary,
+                letterSpacing: -0.3,
+              ),
+            ),
+            const SizedBox(height: PollDesign.sm),
+            const Text(
+              'Check back later for new polls from your team.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                color: PollDesign.textMuted,
+                height: 1.5,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ===================== SKELETON =====================
+
+  Widget _buildSkeletonLoading() {
+    return Skeletonizer(
+      enabled: true,
+      effect: const ShimmerEffect(
+        baseColor: PollDesign.surfaceMuted,
+        highlightColor: PollDesign.border,
+        duration: Duration(seconds: 1),
+      ),
+      child: ListView.separated(
+        padding: const EdgeInsets.fromLTRB(
+          PollDesign.md,
+          PollDesign.md,
+          PollDesign.md,
+          PollDesign.xl,
+        ),
+        itemCount: 3,
+        separatorBuilder: (_, __) =>
+        const SizedBox(height: PollDesign.sm + 4),
+        itemBuilder: (_, __) => _buildSkeletonPollCard(),
+      ),
+    );
+  }
+
+  Widget _buildSkeletonPollCard() {
+    return Container(
+      padding: const EdgeInsets.all(PollDesign.md),
+      decoration: BoxDecoration(
+        color: PollDesign.surface,
+        borderRadius: BorderRadius.circular(PollDesign.radiusLg),
+        border: Border.all(color: PollDesign.border, width: 1),
+      ),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            Icons.poll_outlined,
-            size: 64,
-            color: Colors.grey[400],
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: PollDesign.surfaceMuted,
+                  borderRadius:
+                  BorderRadius.circular(PollDesign.radiusSm),
+                ),
+              ),
+              const SizedBox(width: PollDesign.sm + 4),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      height: 16,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: PollDesign.surfaceMuted,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      height: 11,
+                      width: 100,
+                      decoration: BoxDecoration(
+                        color: PollDesign.surfaceMuted,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
-          Text(
-            'No polls available',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w500,
-              color: Colors.grey[600],
+          const SizedBox(height: PollDesign.md),
+          ...List.generate(
+            3,
+                (_) => Container(
+              margin: const EdgeInsets.only(
+                bottom: PollDesign.sm,
+              ),
+              padding: const EdgeInsets.symmetric(
+                horizontal: PollDesign.md,
+                vertical: PollDesign.md - 2,
+              ),
+              decoration: BoxDecoration(
+                color: PollDesign.surfaceMuted,
+                borderRadius:
+                BorderRadius.circular(PollDesign.radiusSm),
+              ),
+              child: Container(
+                height: 14,
+                decoration: BoxDecoration(
+                  color: PollDesign.border,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Check back later for new polls!',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[500],
-            ),
+          const SizedBox(height: PollDesign.sm),
+          Row(
+            children: [
+              Container(
+                width: 80,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: PollDesign.surfaceMuted,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              const Spacer(),
+              Container(
+                width: 60,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: PollDesign.surfaceMuted,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
+
+  // ===================== POLL CARD =====================
 
   Widget _buildPollCard(Map<String, dynamic> poll) {
     final options = poll['options'] as List<dynamic>;
@@ -276,28 +531,29 @@ class _PollScreenState extends State<PollScreen>
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: PollDesign.surface,
+        borderRadius: BorderRadius.circular(PollDesign.radiusLg),
+        border: Border.all(color: PollDesign.border, width: 1),
+        boxShadow: PollDesign.softShadow,
       ),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(PollDesign.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildPollHeader(poll),
-            const SizedBox(height: 16),
-            _buildPollOptions(options, poll['_id'], hasVoted, isExpired, totalVotes),
-            const SizedBox(height: 16),
+            const SizedBox(height: PollDesign.md),
+            _buildPollOptions(
+              options,
+              poll['_id'],
+              hasVoted,
+              isExpired,
+              totalVotes,
+            ),
+            const SizedBox(height: PollDesign.md),
             _buildPollFooter(poll, totalVotes, hasVoted, isExpired),
             if (totalVotes > 0) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: PollDesign.sm + 4),
               _buildResultsButton(poll),
             ],
           ],
@@ -314,22 +570,33 @@ class _PollScreenState extends State<PollScreen>
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => PollResultsScreen(
+              builder: (_) => PollResultsScreen(
                 pollId: poll['_id'],
                 pollQuestion: poll['question'] ?? 'Untitled Poll',
               ),
             ),
           );
         },
-        icon: const Icon(Icons.bar_chart, size: 18),
+        icon: const Icon(Icons.bar_chart_rounded, size: 16),
         label: const Text('View Results'),
         style: OutlinedButton.styleFrom(
-          foregroundColor: Colors.indigo,
-          side: BorderSide(color: Colors.indigo.withOpacity(0.3)),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
+          foregroundColor: PollDesign.primary,
+          backgroundColor: PollDesign.primarySoft,
+          side: const BorderSide(
+            color: PollDesign.primaryLight,
+            width: 1,
           ),
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(PollDesign.radiusSm),
+          ),
+          padding: const EdgeInsets.symmetric(
+            vertical: PollDesign.sm + 4,
+          ),
+          textStyle: const TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
+            letterSpacing: -0.1,
+          ),
         ),
       ),
     );
@@ -340,18 +607,23 @@ class _PollScreenState extends State<PollScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          padding: const EdgeInsets.all(8),
+          width: 40,
+          height: 40,
           decoration: BoxDecoration(
-            color: Colors.indigo.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
+            color: PollDesign.primarySoft,
+            borderRadius: BorderRadius.circular(PollDesign.radiusSm),
+            border: Border.all(
+              color: PollDesign.primaryLight,
+              width: 1,
+            ),
           ),
-          child: Icon(
-            Icons.poll,
-            color: Colors.indigo[600],
+          child: const Icon(
+            Icons.poll_rounded,
+            color: PollDesign.primary,
             size: 20,
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: PollDesign.sm + 4),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -359,19 +631,38 @@ class _PollScreenState extends State<PollScreen>
               Text(
                 poll['question'] ?? 'Untitled Poll',
                 style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black87,
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w800,
+                  color: PollDesign.textPrimary,
+                  letterSpacing: -0.2,
+                  height: 1.35,
                 ),
               ),
               if (poll['expiresAt'] != null) ...[
-                const SizedBox(height: 4),
-                Text(
-                  'Expires: ${_formatDate(poll['expiresAt'])}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                  ),
+                const SizedBox(height: 5),
+                Row(
+                  children: [
+                    Icon(
+                      _isPollExpired(poll['expiresAt'])
+                          ? Icons.event_busy_rounded
+                          : Icons.schedule_rounded,
+                      size: 11,
+                      color: _isPollExpired(poll['expiresAt'])
+                          ? PollDesign.danger
+                          : PollDesign.textMuted,
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      'Expires: ${_formatDate(poll['expiresAt'])}',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: _isPollExpired(poll['expiresAt'])
+                            ? PollDesign.danger
+                            : PollDesign.textMuted,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ],
@@ -381,16 +672,21 @@ class _PollScreenState extends State<PollScreen>
     );
   }
 
-  Widget _buildPollOptions(List<dynamic> options, String pollId,
-      bool hasVoted, bool isExpired, int totalVotes) {
+  Widget _buildPollOptions(
+      List<dynamic> options,
+      String pollId,
+      bool hasVoted,
+      bool isExpired,
+      int totalVotes,
+      ) {
     return Column(
       children: options.asMap().entries.map((entry) {
         final optionIndex = entry.key;
         final option = entry.value;
         final optionText = option['text'] ?? 'Option ${optionIndex + 1}';
 
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
+        return Padding(
+          padding: const EdgeInsets.only(bottom: PollDesign.sm),
           child: _buildOptionButton(
             optionText,
             optionIndex,
@@ -404,67 +700,85 @@ class _PollScreenState extends State<PollScreen>
     );
   }
 
-  Widget _buildOptionButton(String text, int index, String pollId,
-      bool hasVoted, bool isExpired, int totalVotes) {
+  Widget _buildOptionButton(
+      String text,
+      int index,
+      String pollId,
+      bool hasVoted,
+      bool isExpired,
+      int totalVotes,
+      ) {
     final isDisabled = hasVoted || isExpired;
+
+    // Button colors depend on state
+    final Color bg = isDisabled
+        ? PollDesign.surfaceMuted
+        : PollDesign.primarySoft;
+    final Color borderColor = isDisabled
+        ? PollDesign.border
+        : PollDesign.primaryLight;
+    final Color textColor = isDisabled
+        ? PollDesign.textMuted
+        : PollDesign.textPrimary;
+    final Color dotColor = isDisabled
+        ? PollDesign.neutral
+        : PollDesign.primary;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       width: double.infinity,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDisabled
-              ? Colors.grey[300]!
-              : Colors.indigo.withOpacity(0.3),
-          width: 1.5,
-        ),
-        gradient: isDisabled
-            ? null
-            : LinearGradient(
-          colors: [
-            Colors.indigo.withOpacity(0.05),
-            Colors.indigo.withOpacity(0.02),
-          ],
-        ),
+        color: bg,
+        borderRadius: BorderRadius.circular(PollDesign.radiusSm),
+        border: Border.all(color: borderColor, width: 1),
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(PollDesign.radiusSm),
           onTap: isDisabled ? null : () => _vote(pollId, index),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            padding: const EdgeInsets.symmetric(
+              horizontal: PollDesign.md,
+              vertical: PollDesign.md - 2,
+            ),
             child: Row(
               children: [
                 Container(
-                  width: 6,
-                  height: 6,
+                  width: 8,
+                  height: 8,
                   decoration: BoxDecoration(
-                    color: isDisabled
-                        ? Colors.grey[400]
-                        : Colors.indigo,
+                    color: dotColor,
                     shape: BoxShape.circle,
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: PollDesign.sm + 4),
                 Expanded(
                   child: Text(
                     text,
                     style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      color: isDisabled
-                          ? Colors.grey[600]
-                          : Colors.black87,
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
+                      color: textColor,
+                      letterSpacing: -0.1,
                     ),
                   ),
                 ),
                 if (isDisabled)
                   Icon(
-                    hasVoted ? Icons.check_circle : Icons.schedule,
-                    color: hasVoted ? Colors.green : Colors.grey[400],
-                    size: 20,
+                    hasVoted
+                        ? Icons.check_circle_rounded
+                        : Icons.schedule_rounded,
+                    color: hasVoted
+                        ? PollDesign.success
+                        : PollDesign.textMuted,
+                    size: 16,
+                  )
+                else
+                  Icon(
+                    Icons.radio_button_unchecked_rounded,
+                    color: PollDesign.primary.withOpacity(0.5),
+                    size: 16,
                   ),
               ],
             ),
@@ -474,60 +788,98 @@ class _PollScreenState extends State<PollScreen>
     );
   }
 
-  Widget _buildPollFooter(Map<String, dynamic> poll, int totalVotes,
-      bool hasVoted, bool isExpired) {
+  Widget _buildPollFooter(
+      Map<String, dynamic> poll,
+      int totalVotes,
+      bool hasVoted,
+      bool isExpired,
+      ) {
     return Row(
       children: [
         Icon(
-          Icons.how_to_vote,
-          size: 16,
-          color: Colors.grey[500],
+          Icons.how_to_vote_rounded,
+          size: 13,
+          color: PollDesign.textMuted,
         ),
-        const SizedBox(width: 6),
+        const SizedBox(width: 5),
         Text(
           '$totalVotes ${totalVotes == 1 ? 'vote' : 'votes'}',
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey[600],
-            fontWeight: FontWeight.w500,
+          style: const TextStyle(
+            fontSize: 11.5,
+            color: PollDesign.textSecondary,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.1,
           ),
         ),
         const Spacer(),
         if (hasVoted)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.green.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Text(
-              'Voted',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.green[700],
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+          _buildStatusPill(
+            label: 'VOTED',
+            color: PollDesign.success,
+            bg: PollDesign.successSoft,
+            border: PollDesign.successBorder,
           )
         else if (isExpired)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.red.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Text(
-              'Expired',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.red[700],
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+          _buildStatusPill(
+            label: 'EXPIRED',
+            color: PollDesign.danger,
+            bg: PollDesign.dangerSoft,
+            border: PollDesign.dangerBorder,
+          )
+        else
+          _buildStatusPill(
+            label: 'ACTIVE',
+            color: PollDesign.primary,
+            bg: PollDesign.primarySoft,
+            border: PollDesign.primaryLight,
           ),
       ],
     );
   }
+
+  Widget _buildStatusPill({
+    required String label,
+    required Color color,
+    required Color bg,
+    required Color border,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: PollDesign.sm,
+        vertical: 4,
+      ),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: border, width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 5,
+            height: 5,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 9.5,
+              color: color,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ===================== HELPERS =====================
 
   bool _isPollExpired(String? expiresAt) {
     if (expiresAt == null) return false;
@@ -557,42 +909,5 @@ class _PollScreenState extends State<PollScreen>
     } catch (e) {
       return 'Invalid date';
     }
-  }
-}
-
-// Skeleton option widget for the loading state
-class _SkeletonOption extends StatelessWidget {
-  const _SkeletonOption();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.grey[300]!,
-          width: 1.5,
-        ),
-      ),
-      child: const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(
-          children: [
-            CircleAvatar(radius: 3),
-            SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'This is a skeleton option text',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }

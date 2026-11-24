@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import '../services/PollService.dart';
+import '../services/poll_service.dart';
 
 class PollResultsScreen extends StatefulWidget {
   final String pollId;

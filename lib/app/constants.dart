@@ -1,32 +1,25 @@
 class AppConstants {
   static const String appName = 'Employee Management';
+  static const String appVersion = '1.0.0';
+
+  // API
+  // static const String baseUrl = 'https://staffsync-backend-xp3i.onrender.com';
+  static const String baseUrl = 'http://192.168.1.51:7000';
+  static const String apiBaseUrl = '$baseUrl/api';
+  static const String apiBaseUrlNumber = '$baseUrl/api/plate';
+  static const String socketBaseUrl = baseUrl;
+
+  // Timeout & Retry
   static const Duration apiTimeout = Duration(seconds: 30);
+  static const Duration socketTimeout = Duration(seconds: 20);
+  static const Duration reconnectDelay = Duration(seconds: 3);
   static const int maxRetries = 3;
-  static const String olaApiKey = '81BdA7HuHsQVRzEShFlU0BZTyAjpmDBaxd4zBmiJ';
+  static const int maxReconnectAttempts = 5;
 
-  // Centralized base URLs
-  static const String _baseLocal = 'http://192.168.1.67:5000';
-  // static const String _baseProduction = 'https://hrmbackend-production-0020.up.railway.app';
+  // Services
+  static const String olaApiKey =
+      '81BdA7HuHsQVRzEShFlU0BZTyAjpmDBaxd4zBmiJ';
 
-  // Choose active base (easy switch for dev/prod)
-  static const String _activeBase = _baseLocal;
-  // static const String _activeBase = _baseProduction;
-
-  // Exposed URLs - NO direct hardcoding anywhere else
-  static const String apiBaseUrl = '$_activeBase/api';
-  static const String socketBaseUrl = _activeBase;  // Socket.IO base (no /api)
+  static const String agoraAppId =
+      '0c00953da2be40cda7d04640e5c2812b';
 }
-
-// final NetworkService _networkService = NetworkService();
-// final AuthService _authService = AuthService();
-//
-// // ---------------------------------------------------------
-// // 🔐 Get current user ID
-// // ---------------------------------------------------------
-// Future<String> getCurrentUserId() async {
-//   final userData = await _authService.getCurrentUser();
-//   if (userData == null) {
-//     throw Exception('User not authenticated. Please login.');
-//   }
-//   return userData.id;
-// }

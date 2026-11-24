@@ -85,7 +85,7 @@ class _FAQScreenState extends State<FAQScreen> with SingleTickerProviderStateMix
                         height: 200,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: Colors.white.withOpacity(0.1),
+                          color: Colors.white.withValues(alpha: 0.1),
                         ),
                       ),
                     ),
@@ -97,7 +97,7 @@ class _FAQScreenState extends State<FAQScreen> with SingleTickerProviderStateMix
                         height: 150,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: Colors.white.withOpacity(0.05),
+                          color: Colors.white.withValues(alpha: 0.05),
                         ),
                       ),
                     ),
@@ -177,7 +177,7 @@ class _FAQScreenState extends State<FAQScreen> with SingleTickerProviderStateMix
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
+                  color: Colors.black.withValues(alpha: 0.04),
                   blurRadius: 20,
                   offset: const Offset(0, 4),
                 ),
@@ -217,7 +217,7 @@ class _FAQScreenState extends State<FAQScreen> with SingleTickerProviderStateMix
           width: width,
           height: height,
           decoration: BoxDecoration(
-            color: Colors.grey[300]?.withOpacity(value),
+            color: Colors.grey[300]?.withValues(alpha: value),
             borderRadius: BorderRadius.circular(radius),
           ),
         );
@@ -352,7 +352,7 @@ class _FAQScreenState extends State<FAQScreen> with SingleTickerProviderStateMix
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.deepPurple.withOpacity(0.08),
+            color: Colors.deepPurple.withValues(alpha: 0.08),
             blurRadius: 24,
             offset: const Offset(0, 8),
           ),
@@ -385,7 +385,7 @@ class _FAQScreenState extends State<FAQScreen> with SingleTickerProviderStateMix
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Icon(
@@ -414,7 +414,7 @@ class _FAQScreenState extends State<FAQScreen> with SingleTickerProviderStateMix
                       faq.description,
                       style: TextStyle(
                         fontSize: 14,
-                        color: Colors.white.withOpacity(0.9),
+                        color: Colors.white.withValues(alpha: 0.9),
                         fontWeight: FontWeight.w500,
                         height: 1.4,
                       ),
@@ -440,7 +440,7 @@ class _FAQScreenState extends State<FAQScreen> with SingleTickerProviderStateMix
                     margin: const EdgeInsets.symmetric(vertical: 6),
                     decoration: BoxDecoration(
                       color: isExpanded
-                          ? Colors.deepPurple.shade50.withOpacity(0.5)
+                          ? Colors.deepPurple.shade50.withValues(alpha: 0.5)
                           : Colors.grey.shade50,
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(

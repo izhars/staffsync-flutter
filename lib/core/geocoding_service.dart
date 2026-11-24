@@ -35,9 +35,6 @@ class GeocodingService {
           },
         );
 
-        print('Ola Maps Reverse Geocode Response Status (Attempt $attempt): ${response.statusCode}');
-        print('Ola Maps Reverse Geocode Response Body: ${response.body}');
-
         if (response.statusCode == 200) {
           final data = json.decode(response.body);
           return _parseOlaResponse(data, lat, lon);
@@ -65,9 +62,6 @@ class GeocodingService {
           Uri.parse(url),
           headers: {'User-Agent': 'OlaMapApp/1.0 (contact: your-email@example.com)'},
         );
-
-        print('Nominatim Reverse Geocode Response Status (Attempt $attempt): ${response.statusCode}');
-        print('Nominatim Reverse Geocode Response Body: ${response.body}');
 
         if (response.statusCode == 200) {
           final data = json.decode(response.body);
@@ -178,11 +172,6 @@ class GeocodingService {
       url += '&location=$location&radius=50000'; // Increased radius to 50km
     }
 
-    // Remove strictbounds or make it optional
-    // url += '&strictbounds=false'; // Try without strict bounds first
-
-    print('Ola Maps Request URL: $url');
-
     for (int attempt = 1; attempt <= retries; attempt++) {
       try {
         final response = await http.get(
@@ -194,17 +183,12 @@ class GeocodingService {
           },
         );
 
-        print('Ola Maps Autocomplete Response Status (Attempt $attempt): ${response.statusCode}');
-        print('Ola Maps Autocomplete Response Body: ${response.body}');
-
         if (response.statusCode == 200) {
           final data = json.decode(response.body);
           final predictions = data['predictions'] as List<dynamic>? ?? [];
 
           // Check if predictions is empty and log for debugging
           if (predictions.isEmpty) {
-            print('Warning: Empty predictions for input: "$input"');
-            print('API returned status: ${data['status']}');
             if (data['error_message'] != null && data['error_message'].toString().isNotEmpty) {
               print('Error message: ${data['error_message']}');
             }
@@ -244,8 +228,6 @@ class GeocodingService {
     final encodedInput = Uri.encodeComponent(input.trim());
     final url = 'https://api.olamaps.io/places/v1/autocomplete?input=$encodedInput&api_key=${AppConstants.olaApiKey}';
 
-    print('Ola Maps Global Request URL: $url');
-
     for (int attempt = 1; attempt <= retries; attempt++) {
       try {
         final response = await http.get(
@@ -255,9 +237,6 @@ class GeocodingService {
             'X-Request-Id': 'flutter-app-${DateTime.now().millisecondsSinceEpoch}',
           },
         );
-
-        print('Response Status: ${response.statusCode}');
-        print('Response Body: ${response.body}');
 
         if (response.statusCode == 200) {
           final data = json.decode(response.body);
@@ -297,9 +276,6 @@ class GeocodingService {
           Uri.parse(url),
           headers: {'User-Agent': 'OlaMapApp/1.0 (contact: your-email@example.com)'},
         );
-
-        print('Nominatim Autocomplete Response Status (Attempt $attempt): ${response.statusCode}');
-        print('Nominatim Autocomplete Response Body: ${response.body}');
 
         if (response.statusCode == 200) {
           final data = json.decode(response.body) as List<dynamic>;
@@ -349,9 +325,6 @@ class GeocodingService {
         },
       );
 
-      print('Ola Maps Directions Response: ${response.statusCode}');
-      print('Ola Maps Directions Body: ${response.body}');
-
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
 
@@ -385,7 +358,6 @@ class GeocodingService {
           if (polylineString != null && polylineString.isNotEmpty) {
             try {
               polylinePoints = polylineString.decodePolyline();
-              print('Decoded ${polylinePoints.length} polyline points');
             } catch (e) {
               print('Error decoding polyline: $e');
               // Fallback: create simple line from steps if available
@@ -394,13 +366,10 @@ class GeocodingService {
           }
         }
 
-        // Final fallback: just origin and destination
         if (polylinePoints.isEmpty) {
-          print('Using fallback polyline: origin to destination');
           polylinePoints = [origin, destination];
         }
 
-        // Create RouteModel with proper data structure for Ola Maps
         return RouteModel.fromJson(
           {
             'duration': leg['duration'], // This is an integer (seconds)
@@ -418,7 +387,6 @@ class GeocodingService {
     }
   }
 
-// Helper method to create polyline from steps if main polyline fails
   List<LatLng> _createFallbackPolyline(List<dynamic> stepsData, LatLng origin, LatLng destination) {
     List<LatLng> points = [origin];
 

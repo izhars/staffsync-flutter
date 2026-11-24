@@ -24,4 +24,7 @@ class ApiEndpoints {
   static const String holidays = 'holidays';
   static const String birthdays = 'events/birthdays';
   static const String anniversaries = 'events/anniversaries';
+  // Ticket endpoints
+  static const String tickets = 'tickets';
+  static const String myTickets = 'tickets/my-tickets';
 }

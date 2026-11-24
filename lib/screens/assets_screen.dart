@@ -1,11 +1,91 @@
 import 'dart:ui';
-
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../component/connectivity_wrapper.dart';
 import '../models/Asset.dart';
 import '../services/assets_service.dart';
 import '../services/connectivity_service.dart';
+
+// ===================== SHARED DESIGN TOKENS =====================
+// (Copy this class into a shared file, e.g. `lib/theme/report_design.dart`,
+// and import it from both ReportScreen and AssetsScreen.)
+class AssetsDesign {
+  static const double xs = 4;
+  static const double sm = 8;
+  static const double md = 16;
+  static const double lg = 24;
+  static const double xl = 32;
+
+  static const double radiusSm = 10;
+  static const double radiusMd = 14;
+  static const double radiusLg = 20;
+  static const double radiusXl = 24;
+
+  static const Color primary = Color(0xFF4F46E5);
+  static const Color primaryDark = Color(0xFF4338CA);
+  static const Color primarySoft = Color(0xFFEEF2FF);
+  static const Color primaryLight = Color(0xFFC7D2FE);
+
+  static const Color surface = Colors.white;
+  static const Color surfaceMuted = Color(0xFFF8FAFC);
+  static const Color bg = Color(0xFFF6F7FB);
+  static const Color border = Color(0xFFEAECEF);
+
+  static const Color textPrimary = Color(0xFF1A1D26);
+  static const Color textSecondary = Color(0xFF6B7280);
+  static const Color textMuted = Color(0xFF9CA3AF);
+
+  static const Color present = Color(0xFF059669);
+  static const Color presentSoft = Color(0xFFECFDF5);
+  static const Color presentBorder = Color(0xFFA7F3D0);
+
+  static const Color late = Color(0xFFD97706);
+  static const Color lateSoft = Color(0xFFFFFBEB);
+  static const Color lateBorder = Color(0xFFFDE68A);
+
+  static const Color short = Color(0xFFEA580C);
+  static const Color shortSoft = Color(0xFFFFF7ED);
+  static const Color shortBorder = Color(0xFFFED7AA);
+
+  static const Color absent = Color(0xFFDC2626);
+  static const Color absentSoft = Color(0xFFFEF2F2);
+  static const Color absentBorder = Color(0xFFFECACA);
+
+  static const Color leave = Color(0xFF7C3AED);
+  static const Color leaveSoft = Color(0xFFF5F3FF);
+  static const Color leaveBorder = Color(0xFFDDD6FE);
+
+  static const Color holiday = Color(0xFF2563EB);
+  static const Color holidaySoft = Color(0xFFEFF6FF);
+  static const Color holidayBorder = Color(0xFFBFDBFE);
+
+  static const Color comboOff = Color(0xFF0D9488);
+  static const Color comboOffSoft = Color(0xFFF0FDFA);
+  static const Color comboOffBorder = Color(0xFF99F6E4);
+
+  static const Color neutral = Color(0xFF6B7280);
+  static const Color neutralSoft = Color(0xFFF3F4F6);
+  static const Color neutralBorder = Color(0xFFE5E7EB);
+
+  static List<BoxShadow> get softShadow => [
+    BoxShadow(
+      color: Colors.black.withOpacity(0.04),
+      blurRadius: 14,
+      offset: const Offset(0, 4),
+      spreadRadius: -2,
+    ),
+  ];
+
+  static List<BoxShadow> get cardShadow => [
+    BoxShadow(
+      color: Colors.black.withOpacity(0.06),
+      blurRadius: 22,
+      offset: const Offset(0, 8),
+      spreadRadius: -6,
+    ),
+  ];
+}
 
 class AssetsScreen extends StatefulWidget {
   const AssetsScreen({Key? key}) : super(key: key);
@@ -26,11 +106,8 @@ class _AssetsScreenState extends State<AssetsScreen> {
   void initState() {
     super.initState();
     _loadAssets();
-
-    // Listen to connectivity changes
     _connectivityService.connectionStream.listen((hasConnection) {
       if (hasConnection && !_isLoading && _errorMessage != null) {
-        // Auto-retry when connection comes back
         _loadAssets();
       }
     });
@@ -38,17 +115,15 @@ class _AssetsScreenState extends State<AssetsScreen> {
 
   Future<void> _loadAssets() async {
     try {
-      // Check connectivity first
       final hasConnection = await _connectivityService.hasConnection();
-
       if (!hasConnection) {
         setState(() {
-          _errorMessage = 'No internet connection. Please check your connection and try again.';
+          _errorMessage =
+          'No internet connection. Please check your connection and try again.';
           _isLoading = false;
         });
         return;
       }
-
       final assets = await _assetsService.getMyAssets();
       setState(() {
         _assets = assets;
@@ -68,72 +143,284 @@ class _AssetsScreenState extends State<AssetsScreen> {
     return _assets.where((asset) => asset.category == _selectedFilter).toList();
   }
 
-  Set<String> get _categories {
-    return _assets.map((asset) => asset.category).toSet();
-  }
+  Set<String> get _categories =>
+      _assets.map((asset) => asset.category).toSet();
+
+  // ===================== BUILD =====================
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[100],
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.white,
-        title: const Text(
-          'My Assets',
-          style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        backgroundColor: AssetsDesign.bg,
+        body: Column(
+          children: [
+            _buildHeader(),
+            Expanded(
+              child: ConnectivityWrapper(
+                onRetry: _loadAssets,
+                child: _isLoading
+                    ? _buildLoadingState()
+                    : _errorMessage != null
+                    ? _buildErrorState()
+                    : _buildSuccessState(),
+              ),
+            ),
+          ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.black87),
-            onPressed: _loadAssets,
-          ),
-        ],
-      ),
-      body: ConnectivityWrapper(
-        onRetry: _loadAssets,
-        child: _isLoading
-            ? _buildLoadingState()
-            : _errorMessage != null
-            ? _buildErrorState()
-            : _buildSuccessState(),
       ),
     );
   }
 
+  // ===================== HEADER (mirrors ReportScreen) =====================
+
+  Widget _buildHeader() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [AssetsDesign.primary, AssetsDesign.primaryDark],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: const BorderRadius.vertical(
+          bottom: Radius.circular(AssetsDesign.radiusXl),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AssetsDesign.primary.withOpacity(0.25),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+            spreadRadius: -6,
+          ),
+        ],
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AssetsDesign.md,
+            AssetsDesign.sm,
+            AssetsDesign.md,
+            AssetsDesign.md,
+          ),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Material(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius:
+                    BorderRadius.circular(AssetsDesign.radiusSm),
+                    child: InkWell(
+                      borderRadius:
+                      BorderRadius.circular(AssetsDesign.radiusSm),
+                      onTap: () => Navigator.pop(context),
+                      child: const SizedBox(
+                        width: 40,
+                        height: 40,
+                        child: Icon(
+                          Icons.arrow_back_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: AssetsDesign.sm + 4),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'My Assets',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                            letterSpacing: -0.4,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Hardware & equipment assigned to you',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: Colors.white70,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Material(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius:
+                    BorderRadius.circular(AssetsDesign.radiusSm),
+                    child: InkWell(
+                      borderRadius:
+                      BorderRadius.circular(AssetsDesign.radiusSm),
+                      onTap: _loadAssets,
+                      child: const SizedBox(
+                        width: 40,
+                        height: 40,
+                        child: Icon(
+                          Icons.refresh_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AssetsDesign.md),
+              // Segmented pill bar for filters (replaces FilterChip row)
+              _buildFilterBar(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterBar() {
+    final filters = <Map<String, String>>[
+      {'key': 'all', 'label': 'All (${_assets.length})'},
+      ..._categories.map((c) {
+        final count = _assets.where((a) => a.category == c).length;
+        return {'key': c, 'label': '${_capitalizeFirst(c)} ($count)'};
+      }),
+    ];
+
+    return Container(
+      height: 48,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(AssetsDesign.radiusMd),
+      ),
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: filters.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 4),
+        itemBuilder: (context, i) {
+          final f = filters[i];
+          final isSelected = _selectedFilter == f['key'];
+          return GestureDetector(
+            onTap: () => setState(() => _selectedFilter = f['key']!),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              padding:
+              const EdgeInsets.symmetric(horizontal: AssetsDesign.md),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? AssetsDesign.surface
+                    : Colors.transparent,
+                borderRadius:
+                BorderRadius.circular(AssetsDesign.radiusSm),
+                boxShadow: isSelected
+                    ? [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.08),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+                    : null,
+              ),
+              child: Text(
+                f['label']!,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight:
+                  isSelected ? FontWeight.w700 : FontWeight.w600,
+                  color: isSelected
+                      ? AssetsDesign.primary
+                      : Colors.white.withOpacity(0.85),
+                  letterSpacing: -0.1,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // ===================== LOADING / ERROR / EMPTY =====================
+
   Widget _buildLoadingState() {
     return const Center(
-      child: CircularProgressIndicator(strokeWidth: 3),
+      child: CircularProgressIndicator(
+        strokeWidth: 3,
+        color: AssetsDesign.primary,
+      ),
     );
   }
 
   Widget _buildErrorState() {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24.0),
+        padding: const EdgeInsets.all(AssetsDesign.xl),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.cloud_off_rounded, size: 80, color: Colors.grey[400]),
-            const SizedBox(height: 24),
-            Text(
-              'Oops! Something went wrong',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: Colors.grey[700]),
+            Container(
+              width: 104,
+              height: 104,
+              decoration: const BoxDecoration(
+                color: AssetsDesign.absentSoft,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.cloud_off_rounded,
+                size: 46,
+                color: AssetsDesign.absent,
+              ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AssetsDesign.lg),
+            const Text(
+              'Failed to load assets',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                color: AssetsDesign.textPrimary,
+                letterSpacing: -0.3,
+              ),
+            ),
+            const SizedBox(height: AssetsDesign.sm),
             Text(
               _errorMessage!,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 15, color: Colors.grey),
+              style: const TextStyle(
+                fontSize: 13,
+                color: AssetsDesign.textMuted,
+                height: 1.5,
+              ),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: AssetsDesign.lg),
             ElevatedButton.icon(
               onPressed: _loadAssets,
-              icon: const Icon(Icons.refresh_rounded),
+              icon: const Icon(Icons.refresh_rounded, size: 18),
               label: const Text('Try Again'),
               style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                backgroundColor: AssetsDesign.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AssetsDesign.lg,
+                  vertical: AssetsDesign.sm + 4,
+                ),
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius:
+                  BorderRadius.circular(AssetsDesign.radiusSm),
+                ),
+                textStyle: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13.5,
+                ),
               ),
             ),
           ],
@@ -145,187 +432,208 @@ class _AssetsScreenState extends State<AssetsScreen> {
   Widget _buildSuccessState() {
     if (_assets.isEmpty) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.inventory_2_outlined, size: 90, color: Colors.grey[400]),
-            const SizedBox(height: 20),
-            const Text(
-              'No assets assigned yet',
-              style: TextStyle(fontSize: 18, color: Colors.grey, fontWeight: FontWeight.w500),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Check back later or contact IT',
-              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-            ),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.all(AssetsDesign.xl),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 104,
+                height: 104,
+                decoration: const BoxDecoration(
+                  color: AssetsDesign.neutralSoft,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.inventory_2_outlined,
+                  size: 46,
+                  color: AssetsDesign.textMuted,
+                ),
+              ),
+              const SizedBox(height: AssetsDesign.lg),
+              const Text(
+                'No assets assigned yet',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: AssetsDesign.textPrimary,
+                  letterSpacing: -0.3,
+                ),
+              ),
+              const SizedBox(height: AssetsDesign.sm),
+              const Text(
+                'Check back later or contact IT support',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AssetsDesign.textMuted,
+                  height: 1.5,
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
 
-    return Column(
-      children: [
-        _buildFilterChips(),
-        _buildAssetStats(),
-        Expanded(
-          child: RefreshIndicator(
-            onRefresh: _loadAssets,
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _filteredAssets.length,
-              itemBuilder: (context, index) {
-                return _buildAssetCard(_filteredAssets[index]);
-              },
+    return RefreshIndicator(
+      onRefresh: _loadAssets,
+      color: AssetsDesign.primary,
+      backgroundColor: AssetsDesign.surface,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(
+          AssetsDesign.md,
+          AssetsDesign.md,
+          AssetsDesign.md,
+          AssetsDesign.xl,
+        ),
+        children: [
+          _buildStatsCard(),
+          const SizedBox(height: AssetsDesign.md),
+          ..._filteredAssets.map(
+                (a) => Padding(
+              padding: const EdgeInsets.only(bottom: AssetsDesign.md),
+              child: _buildAssetCard(a),
             ),
           ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildFilterChips() {
-    return Container(
-      color: Colors.white,
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: SizedBox(
-        height: 40, // important: ListView needs a height
-        child: ListView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          children: [
-            _buildFilterChip('all', 'All (${_assets.length})'),
-            ..._categories.map((category) {
-              final count = _assets.where((a) => a.category == category).length;
-              return Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: _buildFilterChip(
-                  category,
-                  '${_capitalizeFirst(category)} ($count)',
-                ),
-              );
-            }).toList(),
-          ],
-        ),
+        ],
       ),
     );
   }
 
+  // ===================== STATS CARD =====================
 
-  Widget _buildFilterChip(String value, String label) {
-    final isSelected = _selectedFilter == value;
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: FilterChip(
-        selected: isSelected,
-        label: Text(label),
-        onSelected: (selected) {
-          setState(() {
-            _selectedFilter = value;
-          });
-        },
-        backgroundColor: Colors.grey[200],
-        selectedColor: Theme.of(context).primaryColor.withOpacity(0.2),
-        labelStyle: TextStyle(
-          color: isSelected ? Theme.of(context).primaryColor : Colors.black87,
-          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAssetStats() {
+  Widget _buildStatsCard() {
     final totalValue = _assets.fold<double>(
       0,
           (sum, asset) => sum + (asset.purchasePrice ?? 0),
     );
 
     return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(AssetsDesign.md),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Theme.of(context).primaryColor,
-            Theme.of(context).primaryColor.withOpacity(0.7),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Theme.of(context).primaryColor.withOpacity(0.3),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: AssetsDesign.surface,
+        borderRadius: BorderRadius.circular(AssetsDesign.radiusLg),
+        border: Border.all(color: AssetsDesign.border, width: 1),
+        boxShadow: AssetsDesign.softShadow,
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildStatItem(
-            'Total Assets',
-            '${_assets.length}',
-            Icons.inventory_2,
+          Expanded(
+            child: _buildStatTile(
+              icon: Icons.inventory_2_rounded,
+              label: 'TOTAL ASSETS',
+              value: '₹${_assets.length}',
+              color: AssetsDesign.primary,
+              bg: AssetsDesign.primarySoft,
+              border: AssetsDesign.primaryLight,
+            ),
           ),
-          Container(
-            height: 40,
-            width: 1,
-            color: Colors.white.withOpacity(0.3),
-          ),
-          _buildStatItem(
-            'Total Value',
-            '\$${totalValue.toStringAsFixed(0)}',
-            Icons.attach_money,
+          const SizedBox(width: AssetsDesign.sm + 2),
+          Expanded(
+            child: _buildStatTile(
+              icon: Icons.currency_rupee,
+              label: 'TOTAL VALUE',
+              value: '\₹${totalValue.toStringAsFixed(0)}',
+              color: AssetsDesign.present,
+              bg: AssetsDesign.presentSoft,
+              border: AssetsDesign.presentBorder,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildStatItem(String label, String value, IconData icon) {
-    return Column(
-      children: [
-        Icon(icon, color: Colors.white, size: 28),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
+  Widget _buildStatTile({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+    required Color bg,
+    required Color border,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(AssetsDesign.sm + 2),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(AssetsDesign.radiusSm + 2),
+        border: Border.all(color: border, width: 1),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(height: 6),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                color: color,
+                letterSpacing: -0.4,
+              ),
+            ),
           ),
-        ),
-        Text(
-          label,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.9),
-            fontSize: 12,
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 10.5,
+              color: AssetsDesign.textSecondary,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.1,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
+  // ===================== ASSET CARD =====================
+
   Widget _buildAssetCard(Asset asset) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+    final catColor = _getCategoryColor(asset.category);
+
+    return Material(
+      color: AssetsDesign.surface,
+      borderRadius: BorderRadius.circular(AssetsDesign.radiusLg),
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AssetsDesign.radiusLg),
         onTap: () => _showAssetDetails(asset),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
+        child: Container(
+          padding: const EdgeInsets.all(AssetsDesign.md),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AssetsDesign.radiusLg),
+            border: Border.all(color: AssetsDesign.border, width: 1),
+            boxShadow: AssetsDesign.softShadow,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  _buildAssetIcon(asset.category),
-                  const SizedBox(width: 12),
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: catColor.withOpacity(0.15),
+                      borderRadius:
+                      BorderRadius.circular(AssetsDesign.radiusSm),
+                    ),
+                    child: Icon(
+                      _getCategoryIcon(asset.category),
+                      color: catColor,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: AssetsDesign.sm + 4),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -333,48 +641,59 @@ class _AssetsScreenState extends State<AssetsScreen> {
                         Text(
                           asset.name,
                           style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w800,
+                            color: AssetsDesign.textPrimary,
+                            letterSpacing: -0.2,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 3),
                         Text(
-                          asset.brandModelDisplay, // Use the new getter
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[600],
+                          asset.brandModelDisplay,
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            color: AssetsDesign.textMuted,
+                            fontWeight: FontWeight.w500,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
                   ),
+                  const SizedBox(width: AssetsDesign.sm),
                   _buildStatusBadge(asset.status),
                 ],
               ),
-              const Divider(height: 24),
+              const SizedBox(height: AssetsDesign.md),
+              Container(height: 1, color: AssetsDesign.border),
+              const SizedBox(height: AssetsDesign.sm + 2),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   _buildInfoChip(
                     Icons.category_outlined,
                     _capitalizeFirst(asset.category),
                   ),
+                  const SizedBox(width: AssetsDesign.sm),
                   _buildInfoChip(
                     Icons.verified_outlined,
                     _capitalizeFirst(asset.condition),
                   ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Icon(Icons.calendar_today, size: 14, color: Colors.grey[600]),
+                  const Spacer(),
+                  const Icon(
+                    Icons.calendar_today_rounded,
+                    size: 12,
+                    color: AssetsDesign.textMuted,
+                  ),
                   const SizedBox(width: 4),
                   Text(
-                    'Assigned: ${_formatDate(asset.assignedDate)}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
+                    _formatDate(asset.assignedDate),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AssetsDesign.textMuted,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
@@ -386,106 +705,32 @@ class _AssetsScreenState extends State<AssetsScreen> {
     );
   }
 
-  Widget _buildAssetIcon(String category) {
-    IconData icon;
-    Color color;
-
-    switch (category.toLowerCase()) {
-      case 'laptop':
-        icon = Icons.laptop_mac;
-        color = Colors.blue;
-        break;
-
-      case 'desktop':
-        icon = Icons.desktop_windows;
-        color = Colors.indigo;
-        break;
-
-      case 'mobile':
-        icon = Icons.phone_android;
-        color = Colors.green;
-        break;
-
-      case 'tablet':
-        icon = Icons.tablet_mac;
-        color = Colors.orange;
-        break;
-
-      case 'accessories':
-        icon = Icons.headphones;
-        color = Colors.pink;
-        break;
-
-      case 'furniture':
-        icon = Icons.chair_alt;
-        color = Colors.brown;
-        break;
-
-      case 'other':
-        icon = Icons.devices_other;
-        color = Colors.grey;
-        break;
-
-      default:
-        icon = Icons.device_unknown;
-        color = Colors.grey;
-    }
-
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Icon(icon, color: color, size: 28),
-    );
-  }
-
   Widget _buildStatusBadge(String status) {
-    Color color;
-    IconData icon;
-
-    switch (status.toLowerCase()) {
-      case 'assigned':
-        color = Colors.green;
-        icon = Icons.check_circle;
-        break;
-      case 'available':
-        color = Colors.blue;
-        icon = Icons.circle_outlined;
-        break;
-      case 'maintenance':
-        color = Colors.orange;
-        icon = Icons.build_circle;
-        break;
-      case 'retired':
-        color = Colors.red;
-        icon = Icons.cancel;
-        break;
-      default:
-        color = Colors.grey;
-        icon = Icons.help_outline;
-    }
+    final (color, bg, border) = _statusStyle(status);
+    final icon = _statusIcon(status);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AssetsDesign.sm,
+        vertical: 3,
+      ),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.3)),
+        color: bg,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: border, width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 4),
+          Icon(icon, size: 10, color: color),
+          const SizedBox(width: 3),
           Text(
-            _capitalizeFirst(status),
+            status.toUpperCase(),
             style: TextStyle(
               color: color,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
+              fontSize: 9.5,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.4,
             ),
           ),
         ],
@@ -495,22 +740,26 @@ class _AssetsScreenState extends State<AssetsScreen> {
 
   Widget _buildInfoChip(IconData icon, String label) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AssetsDesign.sm,
+        vertical: 3,
+      ),
       decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(8),
+        color: AssetsDesign.neutralSoft,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: AssetsDesign.neutralBorder, width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: Colors.grey[700]),
+          Icon(icon, size: 10, color: AssetsDesign.textSecondary),
           const SizedBox(width: 4),
           Text(
             label,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[700],
-              fontWeight: FontWeight.w500,
+            style: const TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+              color: AssetsDesign.textSecondary,
             ),
           ),
         ],
@@ -518,49 +767,29 @@ class _AssetsScreenState extends State<AssetsScreen> {
     );
   }
 
-  Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[600],
-            ),
-          ),
-          Text(
-            value.isNotEmpty ? value : 'N/A', // Handle empty strings
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  // ===================== DETAILS SHEET =====================
 
   void _showAssetDetails(Asset asset) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      backgroundColor: Colors.transparent, // For backdrop blur compatibility
+      backgroundColor: Colors.transparent,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AssetsDesign.radiusXl),
+        ),
       ),
       builder: (context) => ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(AssetsDesign.radiusXl),
+        ),
         child: BackdropFilter(
-          // Optional: add 'dart:ui' import for ImageFilter
           filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
           child: Container(
-            color: Colors.white.withOpacity(0.92), // Frosted glass effect
+            color: AssetsDesign.surface.withOpacity(0.94),
             child: DraggableScrollableSheet(
-              initialChildSize: 0.7,
+              initialChildSize: 0.75,
               minChildSize: 0.5,
               maxChildSize: 0.95,
               expand: false,
@@ -568,79 +797,28 @@ class _AssetsScreenState extends State<AssetsScreen> {
                 controller: scrollController,
                 child: Padding(
                   padding: EdgeInsets.only(
-                    left: 24,
-                    right: 24,
-                    bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+                    left: AssetsDesign.lg,
+                    right: AssetsDesign.lg,
+                    bottom:
+                    MediaQuery.of(context).viewInsets.bottom + AssetsDesign.lg,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Handle bar
                       Center(
                         child: Container(
                           width: 48,
                           height: 5,
-                          margin: const EdgeInsets.symmetric(vertical: 12),
+                          margin: const EdgeInsets.symmetric(
+                              vertical: AssetsDesign.sm + 4),
                           decoration: BoxDecoration(
-                            color: Colors.grey.shade400,
+                            color: AssetsDesign.neutralBorder,
                             borderRadius: BorderRadius.circular(3),
                           ),
                         ),
                       ),
-
-                      // Header Section
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: _getCategoryColor(asset.category).withOpacity(0.15),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                _getCategoryIcon(asset.category),
-                                color: _getCategoryColor(asset.category),
-                                size: 24,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    asset.name,
-                                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.grey.shade900,
-                                    ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'ID: ${asset.assetId}',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodySmall
-                                        ?.copyWith(color: Colors.grey.shade600),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            _buildStatusBadge(asset.status),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Asset Details Card
+                      _buildDetailHeader(asset),
+                      const SizedBox(height: AssetsDesign.lg),
                       _buildSectionCard(
                         title: 'Asset Details',
                         child: Column(
@@ -648,7 +826,10 @@ class _AssetsScreenState extends State<AssetsScreen> {
                           children: [
                             _buildDetailTile('Brand', asset.brand ?? 'N/A'),
                             _buildDetailTile('Model', asset.model ?? 'N/A'),
-                            _buildDetailTile('Category', _capitalizeFirst(asset.category)),
+                            _buildDetailTile(
+                              'Category',
+                              _capitalizeFirst(asset.category),
+                            ),
                             _buildDetailTile(
                               'Condition',
                               _capitalizeFirst(asset.condition),
@@ -658,61 +839,70 @@ class _AssetsScreenState extends State<AssetsScreen> {
                                 size: 18,
                               ),
                             ),
-                            if (asset.location != null && asset.location!.isNotEmpty)
+                            if (asset.location != null &&
+                                asset.location!.isNotEmpty)
                               _buildDetailTile('Location', asset.location!),
                             if (asset.purchaseDate != null)
                               _buildDetailTile(
                                 'Purchase Date',
                                 _formatDate(asset.purchaseDate),
-                                leading: const Icon(Icons.calendar_today_outlined, size: 18),
+                                leading: const Icon(
+                                  Icons.calendar_today_outlined,
+                                  size: 18,
+                                ),
                               ),
                             if (asset.assignedDate != null)
                               _buildDetailTile(
                                 'Assigned Date',
                                 _formatDate(asset.assignedDate),
-                                leading: const Icon(Icons.date_range_outlined, size: 18),
+                                leading: const Icon(
+                                  Icons.date_range_outlined,
+                                  size: 18,
+                                ),
                               ),
                           ],
                         ),
                       ),
-
-                      // Assignment History (if any)
                       if (asset.hasAssignmentHistory) ...[
-                        const SizedBox(height: 20),
+                        const SizedBox(height: AssetsDesign.md),
                         _buildSectionCard(
                           title: 'Assignment History',
-                          subtitle: 'Total assignments: ${asset.totalAssignments}',
+                          subtitle:
+                          'Total: ${asset.totalAssignments}',
                           child: Column(
                             children: [
-                              ...asset.assignmentHistory.map((record) =>
-                                  _buildAssignmentHistoryCard(record)
-                              ).toList(),
+                              ...asset.assignmentHistory
+                                  .map((r) => _buildAssignmentHistoryCard(r))
+                                  .toList(),
                             ],
                           ),
                         ),
                       ],
-
-                      const SizedBox(height: 32),
-
-                      // Close Button
+                      const SizedBox(height: AssetsDesign.xl),
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
                           onPressed: () => Navigator.pop(context),
-                          icon: const Icon(Icons.close, size: 18),
+                          icon: const Icon(Icons.close_rounded, size: 18),
                           label: const Text('Close Details'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.grey.shade200,
-                            foregroundColor: Colors.grey.shade800,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            backgroundColor: AssetsDesign.neutralSoft,
+                            foregroundColor: AssetsDesign.textPrimary,
+                            padding: const EdgeInsets.symmetric(
+                                vertical: AssetsDesign.md),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: BorderRadius.circular(
+                                  AssetsDesign.radiusMd),
                             ),
                             elevation: 0,
+                            textStyle: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13.5,
+                            ),
                           ),
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: AssetsDesign.md),
                     ],
                   ),
                 ),
@@ -724,61 +914,125 @@ class _AssetsScreenState extends State<AssetsScreen> {
     );
   }
 
-// ——— Helper Widgets ——————————————————————————————————————————————
+  Widget _buildDetailHeader(Asset asset) {
+    final catColor = _getCategoryColor(asset.category);
+    return Container(
+      padding: const EdgeInsets.all(AssetsDesign.md),
+      decoration: BoxDecoration(
+        color: AssetsDesign.primarySoft,
+        borderRadius: BorderRadius.circular(AssetsDesign.radiusLg),
+        border: Border.all(color: AssetsDesign.primaryLight, width: 1),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: catColor.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(AssetsDesign.radiusMd),
+            ),
+            child: Icon(
+              _getCategoryIcon(asset.category),
+              color: catColor,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: AssetsDesign.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  asset.name,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: AssetsDesign.textPrimary,
+                    letterSpacing: -0.3,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'ID: ${asset.assetId}',
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    color: AssetsDesign.textMuted,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          _buildStatusBadge(asset.status),
+        ],
+      ),
+    );
+  }
 
   Widget _buildSectionCard({
     required String title,
     String? subtitle,
     required Widget child,
   }) {
-    return Card(
-      margin: EdgeInsets.zero,
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      clipBehavior: Clip.hardEdge,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+    return Container(
+      decoration: BoxDecoration(
+        color: AssetsDesign.surface,
+        borderRadius: BorderRadius.circular(AssetsDesign.radiusLg),
+        border: Border.all(color: AssetsDesign.border, width: 1),
+        boxShadow: AssetsDesign.softShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(AssetsDesign.md),
+            child: Row(
               children: [
                 Expanded(
                   child: Text(
                     title,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade800,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: AssetsDesign.textPrimary,
+                      letterSpacing: -0.2,
                     ),
                   ),
                 ),
                 if (subtitle != null)
                   Text(
                     subtitle,
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(color: Colors.grey.shade600),
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      color: AssetsDesign.textMuted,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
               ],
             ),
-            const SizedBox(height: 12),
-            child,
-          ],
-        ),
+          ),
+          Container(height: 1, color: AssetsDesign.border),
+          Padding(
+            padding: const EdgeInsets.all(AssetsDesign.md),
+            child: child,
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildDetailTile(String label, String value, {Widget? leading}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: AssetsDesign.xs + 2),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (leading != null) ...[
             leading,
-            const SizedBox(width: 12),
+            const SizedBox(width: AssetsDesign.sm + 4),
           ],
           Expanded(
             child: Column(
@@ -786,17 +1040,20 @@ class _AssetsScreenState extends State<AssetsScreen> {
               children: [
                 Text(
                   label,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(color: Colors.grey.shade600, fontWeight: FontWeight.w500),
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    color: AssetsDesign.textMuted,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   value,
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.w500,
-                    color: Colors.grey.shade900,
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: AssetsDesign.textPrimary,
+                    letterSpacing: -0.1,
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -809,162 +1066,237 @@ class _AssetsScreenState extends State<AssetsScreen> {
     );
   }
 
-// ——— Utility Functions ——————————————————————————————————————————
+  Widget _buildAssignmentHistoryCard(AssignmentRecord record) {
+    final returned = record.returnedDate != null;
+    final (color, bg, border) = returned
+        ? (AssetsDesign.neutral, AssetsDesign.neutralSoft,
+    AssetsDesign.neutralBorder)
+        : (AssetsDesign.present, AssetsDesign.presentSoft,
+    AssetsDesign.presentBorder);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: AssetsDesign.sm),
+      padding: const EdgeInsets.all(AssetsDesign.sm + 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(AssetsDesign.radiusMd),
+        border: Border.all(color: border, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Employee: ${record.employee.substring(0, 8)}...',
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: AssetsDesign.textPrimary,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AssetsDesign.sm, vertical: 3),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  returned ? 'RETURNED' : 'ACTIVE',
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w800,
+                    color: color,
+                    letterSpacing: 0.4,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AssetsDesign.sm),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Assigned: ${_formatDateShort(record.assignedDate)}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AssetsDesign.textMuted,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    if (record.returnedDate != null)
+                      Text(
+                        'Returned: ${_formatDateShort(record.returnedDate!)}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AssetsDesign.textMuted,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AssetsDesign.sm, vertical: 3),
+                decoration: BoxDecoration(
+                  color: _getConditionColor(record.condition)
+                      .withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  record.condition.toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w800,
+                    color: _getConditionColor(record.condition),
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (record.remarks.isNotEmpty) ...[
+            const SizedBox(height: AssetsDesign.sm),
+            Text(
+              record.remarks,
+              style: const TextStyle(
+                fontSize: 11,
+                color: AssetsDesign.textSecondary,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ===================== STATUS / COLOR HELPERS =====================
+
+  (Color, Color, Color) _statusStyle(String status) {
+    switch (status.toLowerCase()) {
+      case 'assigned':
+        return (AssetsDesign.present, AssetsDesign.presentSoft,
+        AssetsDesign.presentBorder);
+      case 'available':
+        return (AssetsDesign.holiday, AssetsDesign.holidaySoft,
+        AssetsDesign.holidayBorder);
+      case 'maintenance':
+        return (AssetsDesign.late, AssetsDesign.lateSoft,
+        AssetsDesign.lateBorder);
+      case 'retired':
+        return (AssetsDesign.absent, AssetsDesign.absentSoft,
+        AssetsDesign.absentBorder);
+      default:
+        return (AssetsDesign.neutral, AssetsDesign.neutralSoft,
+        AssetsDesign.neutralBorder);
+    }
+  }
+
+  IconData _statusIcon(String status) {
+    switch (status.toLowerCase()) {
+      case 'assigned':
+        return Icons.check_circle_rounded;
+      case 'available':
+        return Icons.circle_outlined;
+      case 'maintenance':
+        return Icons.build_circle_rounded;
+      case 'retired':
+        return Icons.cancel_rounded;
+      default:
+        return Icons.help_outline_rounded;
+    }
+  }
 
   Color _getCategoryColor(String category) {
     switch (category.toLowerCase()) {
-      case 'laptop': return Colors.blue;
-      case 'phone': return Colors.green;
-      case 'tablet': return Colors.orange;
-      case 'monitor': return Colors.purple;
-      default: return Colors.grey;
+      case 'laptop':
+        return AssetsDesign.holiday;
+      case 'desktop':
+        return AssetsDesign.primary;
+      case 'mobile':
+      case 'phone':
+        return AssetsDesign.present;
+      case 'tablet':
+        return AssetsDesign.short;
+      case 'accessories':
+        return AssetsDesign.leave;
+      case 'furniture':
+        return AssetsDesign.comboOff;
+      default:
+        return AssetsDesign.neutral;
     }
   }
 
   IconData _getCategoryIcon(String category) {
     switch (category.toLowerCase()) {
-      case 'laptop': return Icons.laptop;
-      case 'phone': return Icons.phone_android;
-      case 'tablet': return Icons.tablet_android;
-      case 'monitor': return Icons.monitor;
-      default: return Icons.devices;
-    }
-  }
-
-  Color _getStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'active': return Colors.green;
-      case 'inactive': return Colors.grey;
-      case 'maintenance': return Colors.orange;
-      case 'retired': return Colors.red;
-      default: return Colors.blue;
+      case 'laptop':
+        return Icons.laptop_mac_rounded;
+      case 'desktop':
+        return Icons.desktop_windows_rounded;
+      case 'mobile':
+      case 'phone':
+        return Icons.phone_android_rounded;
+      case 'tablet':
+        return Icons.tablet_mac_rounded;
+      case 'accessories':
+        return Icons.headphones_rounded;
+      case 'furniture':
+        return Icons.chair_alt_rounded;
+      default:
+        return Icons.devices_other_rounded;
     }
   }
 
   Color _getConditionColor(String condition) {
     switch (condition.toLowerCase()) {
-      case 'excellent': return Colors.green;
-      case 'good': return Colors.blue;
-      case 'fair': return Colors.orange;
-      case 'poor': return Colors.red;
-      default: return Colors.grey;
+      case 'excellent':
+        return AssetsDesign.present;
+      case 'good':
+        return AssetsDesign.holiday;
+      case 'fair':
+        return AssetsDesign.late;
+      case 'poor':
+        return AssetsDesign.absent;
+      default:
+        return AssetsDesign.neutral;
     }
   }
 
   IconData _getConditionIcon(String condition) {
     switch (condition.toLowerCase()) {
-      case 'excellent': return Icons.star;
-      case 'good': return Icons.star_half;
-      case 'fair': return Icons.star_border;
-      case 'poor': return Icons.warning;
-      default: return Icons.info_outline;
+      case 'excellent':
+        return Icons.star_rounded;
+      case 'good':
+        return Icons.star_half_rounded;
+      case 'fair':
+        return Icons.star_border_rounded;
+      case 'poor':
+        return Icons.warning_amber_rounded;
+      default:
+        return Icons.info_outline_rounded;
     }
-  }
-
-
-  Widget _buildAssignmentHistoryCard(AssignmentRecord record) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      elevation: 1,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: BorderSide(color: Colors.grey[200]!),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Employee: ${record.employee.substring(0, 8)}...', // Show first 8 chars of employee ID
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: record.returnedDate == null
-                        ? Colors.green.withOpacity(0.1)
-                        : Colors.grey.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    record.returnedDate == null ? 'Active' : 'Returned',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: record.returnedDate == null ? Colors.green : Colors.grey,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Assigned: ${_formatDateShort(record.assignedDate)}',
-                        style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                      ),
-                      if (record.returnedDate != null)
-                        Text(
-                          'Returned: ${_formatDateShort(record.returnedDate!)}',
-                          style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                        ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: _getConditionColor(record.condition).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    record.condition,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: _getConditionColor(record.condition),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            if (record.remarks.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                'Remarks: ${record.remarks}',
-                style: TextStyle(fontSize: 11, color: Colors.grey[600], fontStyle: FontStyle.italic),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _formatDateShort(DateTime date) {
-    return DateFormat('MMM d, yyyy').format(date);
   }
 
   String _formatDate(DateTime? date) {
     if (date == null) return 'N/A';
     try {
       return DateFormat('MMM dd, yyyy').format(date);
-    } catch (e) {
+    } catch (_) {
       return 'N/A';
     }
   }
+
+  String _formatDateShort(DateTime date) =>
+      DateFormat('MMM d, yyyy').format(date);
 
   String _capitalizeFirst(String text) {
     if (text.isEmpty) return text;

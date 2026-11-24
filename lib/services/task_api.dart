@@ -1,9 +1,24 @@
 import 'network_service.dart';
 import 'auth_service.dart';
 
+/// Typed exception so the UI can distinguish error kinds.
+class TaskApiException implements Exception {
+  final String message;
+  final int? statusCode;
+
+  TaskApiException(this.message, {this.statusCode});
+
+  @override
+  String toString() => message;
+}
+
 class TaskApi {
-  final NetworkService _networkService = NetworkService();
-  final AuthService _authService = AuthService();
+  final NetworkService _networkService;
+  final AuthService _authService;
+
+  TaskApi({NetworkService? networkService, AuthService? authService})
+      : _networkService = networkService ?? NetworkService(),
+        _authService = authService ?? AuthService();
 
   // ---------------------------------------------------------
   // 🔐 Get current user ID
@@ -12,11 +27,13 @@ class TaskApi {
     try {
       final user = await _authService.getCurrentUser();
       if (user == null) {
-        throw Exception('User not authenticated. Please login.');
+        throw TaskApiException('User not authenticated. Please login.');
       }
       return user.id;
+    } on TaskApiException {
+      rethrow;
     } catch (e) {
-      throw Exception('Failed to get current user ID: $e');
+      throw TaskApiException('Failed to get current user ID: $e');
     }
   }
 
@@ -31,38 +48,45 @@ class TaskApi {
       final response = await _networkService.get(
         '/tasks?page=$page&limit=$limit',
       );
+
+      if (response is! Map) {
+        throw TaskApiException('Invalid response format');
+      }
       return Map<String, dynamic>.from(response);
+    } on TaskApiException {
+      rethrow;
     } catch (e) {
-      throw Exception('Failed to fetch tasks: $e');
+      throw TaskApiException('Failed to fetch tasks: $e');
     }
   }
 
   // ---------------------------------------------------------
-  // 📌 Get single task by ID with proper error handling
+  // 📌 Get single task by ID
   // ---------------------------------------------------------
   Future<Map<String, dynamic>> getTask(String id) async {
     try {
       final response = await _networkService.get('/tasks/$id');
 
-      // Check if response is valid
-      if (response is! Map<String, dynamic>) {
-        throw Exception('Invalid response format');
+      if (response is! Map) {
+        throw TaskApiException('Invalid response format');
       }
 
-      // Check success flag
-      if (response['success'] != true) {
-        throw Exception(response['message'] ?? 'Failed to fetch task');
+      final map = Map<String, dynamic>.from(response);
+
+      if (map['success'] != true) {
+        throw TaskApiException(map['message']?.toString() ?? 'Failed to fetch task');
       }
 
-      // Extract data
-      final data = response['data'];
-      if (data is! Map<String, dynamic>) {
-        throw Exception('Invalid data format');
+      final data = map['data'];
+      if (data is! Map) {
+        throw TaskApiException('Invalid data format');
       }
 
-      return data;
+      return Map<String, dynamic>.from(data);
+    } on TaskApiException {
+      rethrow;
     } catch (e) {
-      throw Exception('Failed to fetch task: $e');
+      throw TaskApiException('Failed to fetch task: $e');
     }
   }
 
@@ -71,18 +95,28 @@ class TaskApi {
   // ---------------------------------------------------------
   Future<Map<String, dynamic>> completeTask(String id) async {
     try {
-      final response = await _networkService.post(
-        '/tasks/$id/complete',
-        {},
-      );
+      final response = await _networkService.post('/tasks/$id/complete', {});
 
-      if (response['success'] == true) {
-        return response['data'];
-      } else {
-        throw Exception(response['message'] ?? 'Failed to complete task');
+      if (response is! Map) {
+        throw TaskApiException('Invalid response format');
       }
+
+      final map = Map<String, dynamic>.from(response);
+
+      if (map['success'] != true) {
+        throw TaskApiException(map['message']?.toString() ?? 'Failed to complete task');
+      }
+
+      final data = map['data'];
+      if (data is! Map) {
+        throw TaskApiException('Invalid data format');
+      }
+
+      return Map<String, dynamic>.from(data);
+    } on TaskApiException {
+      rethrow;
     } catch (e) {
-      throw Exception('Failed to complete task: $e');
+      throw TaskApiException('Failed to complete task: $e');
     }
   }
 
@@ -93,18 +127,29 @@ class TaskApi {
     try {
       final response = await _networkService.post(
         '/tasks/$id/comments',
-        {
-          'text': text,  // Only send text, remove userId
-        },
+        {'text': text},
       );
 
-      if (response['success'] == true) {
-        return response['data']; // this returns the task object with updated comments
-      } else {
-        throw Exception(response['message'] ?? 'Failed to add comment');
+      if (response is! Map) {
+        throw TaskApiException('Invalid response format');
       }
+
+      final map = Map<String, dynamic>.from(response);
+
+      if (map['success'] != true) {
+        throw TaskApiException(map['message']?.toString() ?? 'Failed to add comment');
+      }
+
+      final data = map['data'];
+      if (data is! Map) {
+        throw TaskApiException('Invalid data format');
+      }
+
+      return Map<String, dynamic>.from(data);
+    } on TaskApiException {
+      rethrow;
     } catch (e) {
-      throw Exception('Failed to add comment: $e');
+      throw TaskApiException('Failed to add comment: $e');
     }
   }
 }

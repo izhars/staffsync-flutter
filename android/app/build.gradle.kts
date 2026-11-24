@@ -9,7 +9,7 @@ plugins {
 
 android {
     namespace = "com.staffsync.staffsync"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36
     ndkVersion = "27.0.12077973"
 
     compileOptions {
@@ -23,11 +23,8 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.staffsync.staffsync"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        minSdk = 24
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -50,10 +47,16 @@ flutter {
 dependencies {
     // Firebase BOM (Bill of Materials)
     implementation(platform("com.google.firebase:firebase-bom:33.1.2"))
+
     // Core library desugaring
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.3")
+
     implementation("androidx.multidex:multidex:2.0.1")
+
     // Firebase SDKs
     implementation("com.google.firebase:firebase-analytics")
     implementation("com.google.firebase:firebase-messaging")
+
+    // Required by uCrop image cropping
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 }

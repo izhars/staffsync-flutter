@@ -8,10 +8,11 @@ class AttendanceService {
   // 🔥 Check-In
   // ---------------------------------------------------------
   Future<Map<String, dynamic>> checkIn({
-    required double latitude,
-    required double longitude,
+    double? latitude,
+    double? longitude,
     required String address,
     required String deviceInfo,
+    List<double>? faceEmbedding,
   }) async {
     try {
       return await _network.post(
@@ -21,6 +22,7 @@ class AttendanceService {
           "longitude": longitude,
           "address": address,
           "deviceInfo": deviceInfo,
+          if (faceEmbedding != null) "faceEmbedding": faceEmbedding,
         },
       );
     } catch (e) {
@@ -29,14 +31,12 @@ class AttendanceService {
     }
   }
 
-  // ---------------------------------------------------------
-  // 🔥 Check-Out
-  // ---------------------------------------------------------
   Future<Map<String, dynamic>> checkOut({
     required double latitude,
     required double longitude,
     required String address,
     required String deviceInfo,
+    List<double>? faceEmbedding,
   }) async {
     try {
       return await _network.post(
@@ -46,6 +46,7 @@ class AttendanceService {
           "longitude": longitude,
           "address": address,
           "deviceInfo": deviceInfo,
+          if (faceEmbedding != null) "faceEmbedding": faceEmbedding,
         },
       );
     } catch (e) {
@@ -126,6 +127,52 @@ class AttendanceService {
     }
 
     return null;
+  }
+
+  // ---------------------------------------------------------
+  // 🔥 Attendance Regularization
+  // ---------------------------------------------------------
+  Future<Map<String, dynamic>> requestRegularization({
+    required String date,
+    required String checkInTime,
+    String? checkOutTime,
+    required String reason,
+  }) async {
+    try {
+      return await _network.post(
+        "/attendance/regularization",
+        {
+          "date": date,
+          "requestedCheckIn": checkInTime,
+          if (checkOutTime != null && checkOutTime.isNotEmpty)
+            "requestedCheckOut": checkOutTime,
+          "reason": reason,
+        },
+      );
+    } catch (e) {
+      if (e is ApiException) throw e;
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> fetchMyRegularizations({
+    String? status,
+    int? month,
+    int? year,
+  }) async {
+    try {
+      String url = "/attendance/regularization/my";
+      final params = <String>[];
+      if (status != null) params.add("status=$status");
+      if (month != null) params.add("month=$month");
+      if (year != null) params.add("year=$year");
+      if (params.isNotEmpty) url += "?${params.join('&')}";
+
+      return await _network.get(url);
+    } catch (e) {
+      if (e is ApiException) throw e;
+      rethrow;
+    }
   }
 
   // ---------------------------------------------------------

@@ -3,6 +3,7 @@ class Quote {
   final int? id;
   final String text;          // 'body' in /quotes, 'body' in /qotd
   final String author;
+  final String body;  // Quote text
   final String? authorPermalink;
   final List<String>? tags;
   final int? favoritesCount;
@@ -20,6 +21,7 @@ class Quote {
     this.id,
     required this.text,
     required this.author,
+    required this.body,
     this.authorPermalink,
     this.tags,
     this.favoritesCount,
@@ -58,6 +60,7 @@ class Quote {
       downvotesCount: json['downvotes_count'] as int?,
       favorite: json['favorite'] as bool?,
       dialogue: isDialogue,
+      body: json['body'] ?? '',
       private: json['private'] as bool?,
       url: json['url'] as String?,
       source: json['source'] as String?,

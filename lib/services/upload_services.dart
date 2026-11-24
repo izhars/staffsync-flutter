@@ -6,7 +6,7 @@ import 'package:path/path.dart' as path;
 import 'package:mime/mime.dart';
 import 'api_exception.dart';
 import 'auth_service.dart';
-import 'network_service.dart'; // Import your NetworkService
+import 'network_service.dart';
 import 'package:http_parser/http_parser.dart';
 
 /// Service for handling file uploads to the server and Cloudinary

@@ -1,4 +1,4 @@
-import '../models/ComboOff.dart';
+import '../models/combo_off.dart';
 import 'network_service.dart';
 
 class ComboApi {

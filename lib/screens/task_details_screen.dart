@@ -1,5 +1,60 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import '../services/task_api.dart';
+
+// Same design tokens
+class TaskDesign {
+  static const double xs = 4;
+  static const double sm = 8;
+  static const double md = 16;
+  static const double lg = 24;
+  static const double xl = 32;
+
+  static const double radiusSm = 10;
+  static const double radiusMd = 14;
+  static const double radiusLg = 20;
+  static const double radiusXl = 24;
+
+  static const Color primary = Color(0xFFD97706);
+  static const Color primaryDark = Color(0xFFB45309);
+  static const Color primarySoft = Color(0xFFFFFBEB);
+  static const Color primaryLight = Color(0xFFFDE68A);
+
+  static const Color surface = Colors.white;
+  static const Color surfaceMuted = Color(0xFFF8FAFC);
+  static const Color bg = Color(0xFFF6F7FB);
+  static const Color border = Color(0xFFEAECEF);
+
+  static const Color textPrimary = Color(0xFF1A1D26);
+  static const Color textSecondary = Color(0xFF6B7280);
+  static const Color textMuted = Color(0xFF9CA3AF);
+
+  static const Color success = Color(0xFF059669);
+  static const Color successSoft = Color(0xFFECFDF5);
+  static const Color successBorder = Color(0xFFA7F3D0);
+
+  static const Color warning = Color(0xFFD97706);
+  static const Color warningSoft = Color(0xFFFFFBEB);
+  static const Color warningBorder = Color(0xFFFDE68A);
+
+  static const Color danger = Color(0xFFDC2626);
+  static const Color dangerSoft = Color(0xFFFEF2F2);
+  static const Color dangerBorder = Color(0xFFFECACA);
+
+  static const Color info = Color(0xFF4F46E5);
+  static const Color infoSoft = Color(0xFFEEF2FF);
+  static const Color infoBorder = Color(0xFFC7D2FE);
+
+  static List<BoxShadow> get softShadow => [
+    BoxShadow(
+      color: Colors.black.withOpacity(0.04),
+      blurRadius: 14,
+      offset: const Offset(0, 4),
+      spreadRadius: -2,
+    ),
+  ];
+}
 
 class TaskDetailsScreen extends StatefulWidget {
   final String taskId;
@@ -16,23 +71,62 @@ class TaskDetailsScreen extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  _TaskDetailsScreenState createState() => _TaskDetailsScreenState();
+  State<TaskDetailsScreen> createState() => _TaskDetailsScreenState();
 }
 
 class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
-  late Map<String, dynamic> _task;
+  Map<String, dynamic> _task = {};
   bool _isLoading = true;
   bool _isRefreshing = false;
-  final TextEditingController _commentController = TextEditingController();
   bool _isAddingComment = false;
   bool _isCompletingTask = false;
+
+  final TextEditingController _commentController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode _commentFocusNode = FocusNode();
+
+  static const Map<String, Map<String, dynamic>> _categoryMeta = {
+    'onboarding': {
+      'label': 'Onboarding',
+      'fg': Color(0xFF4F46E5),
+      'soft': Color(0xFFEEF2FF),
+      'border': Color(0xFFC7D2FE),
+    },
+    'offboarding': {
+      'label': 'Offboarding',
+      'fg': Color(0xFFB45309),
+      'soft': Color(0xFFFFFBEB),
+      'border': Color(0xFFFDE68A),
+    },
+    'training': {
+      'label': 'Training',
+      'fg': Color(0xFF0D9488),
+      'soft': Color(0xFFF0FDFA),
+      'border': Color(0xFF99F6E4),
+    },
+    'performance': {
+      'label': 'Performance',
+      'fg': Color(0xFF7C3AED),
+      'soft': Color(0xFFF5F3FF),
+      'border': Color(0xFFDDD6FE),
+    },
+    'compliance': {
+      'label': 'Compliance',
+      'fg': Color(0xFFDC2626),
+      'soft': Color(0xFFFEF2F2),
+      'border': Color(0xFFFECACA),
+    },
+    'general': {
+      'label': 'General',
+      'fg': Color(0xFF6B7280),
+      'soft': Color(0xFFF3F4F6),
+      'border': Color(0xFFE5E7EB),
+    },
+  };
 
   @override
   void initState() {
     super.initState();
-    _task = {};
     _loadTask();
   }
 
@@ -46,116 +140,104 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
 
   Future<void> _loadTask() async {
     if (!mounted) return;
-
     setState(() => _isLoading = true);
+
     try {
       final taskData = await widget.taskApi.getTask(widget.taskId);
-      final processedTask = _processTaskData(taskData);
+      final processed = _processTaskData(taskData);
 
-      if (mounted) {
-        setState(() {
-          _task = processedTask;
-          _isLoading = false;
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _task = processed;
+        _isLoading = false;
+      });
     } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-        _showSnackBar('Failed to load task: $e', isError: true);
-      }
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      _showSnackBar('Failed to load task: $e', isError: true);
     }
   }
 
   Future<void> _refreshTask() async {
     if (!mounted) return;
-
     setState(() => _isRefreshing = true);
+
     try {
       final taskData = await widget.taskApi.getTask(widget.taskId);
-      final processedTask = _processTaskData(taskData);
+      final processed = _processTaskData(taskData);
 
-      if (mounted) {
-        setState(() {
-          _task = processedTask;
-          _isRefreshing = false;
-        });
-        widget.onTaskUpdated(processedTask);
-      }
+      if (!mounted) return;
+      setState(() {
+        _task = processed;
+        _isRefreshing = false;
+      });
+      widget.onTaskUpdated(processed);
     } catch (e) {
-      if (mounted) {
-        setState(() => _isRefreshing = false);
-        _showSnackBar('Failed to refresh task: $e', isError: true);
-      }
+      if (!mounted) return;
+      setState(() => _isRefreshing = false);
+      _showSnackBar('Failed to refresh task: $e', isError: true);
     }
   }
 
   Map<String, dynamic> _processTaskData(Map<String, dynamic> taskData) {
-    final processedTask = Map<String, dynamic>.from(taskData);
+    final processed = Map<String, dynamic>.from(taskData);
+    processed['assignee'] = _normalizeUser(processed['assignee']);
+    processed['assigner'] = _normalizeUser(processed['assigner']);
 
-    if (processedTask['assignee'] is String) {
-      processedTask['assignee'] = {
-        '_id': processedTask['assignee'],
-        'firstName': 'User',
-        'lastName': '',
-        'fullName': 'User'
-      };
-    }
+    final rawComments = processed['comments'];
+    final comments = rawComments is List
+        ? rawComments
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        : <Map<String, dynamic>>[];
 
-    if (processedTask['assigner'] is String) {
-      processedTask['assigner'] = {
-        '_id': processedTask['assigner'],
-        'firstName': 'User',
-        'lastName': '',
-        'fullName': 'User'
-      };
-    }
+    final normalized = comments.map((c) {
+      final out = Map<String, dynamic>.from(c);
+      out['author'] = _normalizeUser(c['author']);
+      return out;
+    }).toList();
 
-    if (!processedTask.containsKey('comments')) {
-      processedTask['comments'] = [];
-    } else if (processedTask['comments'] is! List) {
-      processedTask['comments'] = [];
-    }
-
-    final comments = List<Map<String, dynamic>>.from(processedTask['comments']);
-    final processedComments = <Map<String, dynamic>>[];
-
-    for (var comment in comments) {
-      final processedComment = Map<String, dynamic>.from(comment);
-
-      if (comment['author'] is Map) {
-        final author = Map<String, dynamic>.from(comment['author']);
-        if (author['_id'] == widget.currentUserId) {
-          author['firstName'] = 'You';
-          author['fullName'] = 'You';
-        }
-        processedComment['author'] = author;
-      } else if (comment['author'] is String) {
-        final authorId = comment['author'] as String;
-        final author = <String, dynamic>{
-          '_id': authorId,
-          'firstName': 'User',
-          'lastName': '',
-          'fullName': 'User',
-        };
-        if (authorId == widget.currentUserId) {
-          author['firstName'] = 'You';
-          author['fullName'] = 'You';
-        }
-        processedComment['author'] = author;
-      }
-
-      processedComments.add(processedComment);
-    }
-
-    // Sort comments by createdAt (oldest first for chat-like experience)
-    processedComments.sort((a, b) {
-      final dateA = DateTime.parse(a['createdAt'] ?? DateTime.now().toString());
-      final dateB = DateTime.parse(b['createdAt'] ?? DateTime.now().toString());
-      return dateA.compareTo(dateB); // Ascending order (oldest first)
+    normalized.sort((a, b) {
+      final da = DateTime.tryParse(a['createdAt']?.toString() ?? '');
+      final db = DateTime.tryParse(b['createdAt']?.toString() ?? '');
+      if (da == null && db == null) return 0;
+      if (da == null) return -1;
+      if (db == null) return 1;
+      return da.compareTo(db);
     });
 
-    processedTask['comments'] = processedComments;
-    return processedTask;
+    processed['comments'] = normalized;
+    return processed;
+  }
+
+  Map<String, dynamic> _normalizeUser(dynamic raw) {
+    if (raw is Map) {
+      final user = Map<String, dynamic>.from(raw);
+      if (user['_id']?.toString() == widget.currentUserId) {
+        user['firstName'] = 'You';
+        user['fullName'] = 'You';
+      }
+      return user;
+    }
+    if (raw is String) {
+      final user = <String, dynamic>{
+        '_id': raw,
+        'firstName': 'User',
+        'lastName': '',
+        'fullName': 'User',
+      };
+      if (raw == widget.currentUserId) {
+        user['firstName'] = 'You';
+        user['fullName'] = 'You';
+      }
+      return user;
+    }
+    return <String, dynamic>{
+      '_id': '',
+      'firstName': 'Unknown',
+      'lastName': '',
+      'fullName': 'Unknown',
+    };
   }
 
   Future<void> _addComment() async {
@@ -163,18 +245,18 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     if (text.isEmpty) return;
 
     FocusScope.of(context).unfocus();
-
     setState(() => _isAddingComment = true);
+
     try {
-      await widget.taskApi.addComment(_task['_id'], text);
-      await _refreshTask();
+      final updatedTask = await widget.taskApi.addComment(_task['_id'], text);
+      final processed = _processTaskData(updatedTask);
+
+      if (!mounted) return;
+      setState(() => _task = processed);
+      widget.onTaskUpdated(processed);
       _commentController.clear();
+      _showSnackBar('Comment added successfully!', isError: false);
 
-      if (mounted) {
-        _showSnackBar('Comment added successfully!', isError: false);
-      }
-
-      // Scroll to bottom to show new comment
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_scrollController.hasClients) {
           _scrollController.animateTo(
@@ -185,13 +267,10 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
         }
       });
     } catch (e) {
-      if (mounted) {
-        _showSnackBar('Error adding comment: $e', isError: true);
-      }
+      if (!mounted) return;
+      _showSnackBar('Error adding comment: $e', isError: true);
     } finally {
-      if (mounted) {
-        setState(() => _isAddingComment = false);
-      }
+      if (mounted) setState(() => _isAddingComment = false);
     }
   }
 
@@ -199,23 +278,17 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     setState(() => _isCompletingTask = true);
     try {
       final updatedTask = await widget.taskApi.completeTask(_task['_id']);
-      final processedTask = _processTaskData(updatedTask);
+      final processed = _processTaskData(updatedTask);
 
-      if (mounted) {
-        setState(() {
-          _task = processedTask;
-        });
-        widget.onTaskUpdated(processedTask);
-        _showSnackBar('Task marked as complete!', isError: false);
-      }
+      if (!mounted) return;
+      setState(() => _task = processed);
+      widget.onTaskUpdated(processed);
+      _showSnackBar('Task marked as complete!', isError: false);
     } catch (e) {
-      if (mounted) {
-        _showSnackBar('Error: $e', isError: true);
-      }
+      if (!mounted) return;
+      _showSnackBar('Error: $e', isError: true);
     } finally {
-      if (mounted) {
-        setState(() => _isCompletingTask = false);
-      }
+      if (mounted) setState(() => _isCompletingTask = false);
     }
   }
 
@@ -223,18 +296,23 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? Colors.red[600] : Colors.green[600],
+        content: Text(
+          message,
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+        backgroundColor:
+        isError ? TaskDesign.danger : TaskDesign.success,
         behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(TaskDesign.radiusSm),
+        ),
+        margin: const EdgeInsets.all(TaskDesign.md),
       ),
     );
   }
 
   String _formatDate(String? dateString) {
     if (dateString == null) return 'Not set';
-
     try {
       final date = DateTime.parse(dateString).toLocal();
       final now = DateTime.now();
@@ -243,72 +321,580 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
       final taskDate = DateTime(date.year, date.month, date.day);
 
       if (taskDate == today) {
-        return 'Today, ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
+        return 'Today, ${DateFormat('h:mm a').format(date)}';
       } else if (taskDate == yesterday) {
-        return 'Yesterday, ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
+        return 'Yesterday, ${DateFormat('h:mm a').format(date)}';
       } else {
-        return '${date.day}/${date.month}/${date.year}';
+        return DateFormat('MMM d, yyyy').format(date);
       }
-    } catch (e) {
+    } catch (_) {
       return 'Invalid date';
     }
   }
 
   String _formatTime(String? dateString) {
     if (dateString == null) return '';
-
     try {
       final date = DateTime.parse(dateString).toLocal();
-      final now = DateTime.now();
-      final difference = now.difference(date);
-
-      if (difference.inSeconds < 60) {
-        return 'Just now';
-      } else if (difference.inMinutes < 60) {
-        return '${difference.inMinutes}m';
-      } else if (difference.inHours < 24) {
-        return '${difference.inHours}h';
-      } else if (difference.inDays < 7) {
-        return '${difference.inDays}d';
-      } else {
-        return '${date.day}/${date.month}';
-      }
-    } catch (e) {
+      final diff = DateTime.now().difference(date);
+      if (diff.inSeconds < 60) return 'Just now';
+      if (diff.inMinutes < 60) return '${diff.inMinutes}m';
+      if (diff.inHours < 24) return '${diff.inHours}h';
+      if (diff.inDays < 7) return '${diff.inDays}d';
+      return DateFormat('MMM d').format(date);
+    } catch (_) {
       return '';
     }
   }
 
-  Color _getCategoryColor(String? category) {
-    switch (category?.toLowerCase()) {
-      case 'urgent':
-        return Colors.red;
-      case 'important':
-        return Colors.orange;
-      case 'meeting':
-        return Colors.purple;
-      case 'development':
-        return Colors.blue;
-      default:
-        return Colors.teal;
+  String _displayName(dynamic user) {
+    if (user is Map) {
+      final first = (user['firstName'] ?? '').toString();
+      final last = (user['lastName'] ?? '').toString();
+      final name = '$first $last'.trim();
+      return name.isEmpty ? 'Unknown' : name;
     }
+    return 'Unknown';
+  }
+
+  // ===================== BUILD =====================
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: TaskDesign.bg,
+        body: Center(
+          child: CircularProgressIndicator.adaptive(
+            valueColor:
+            AlwaysStoppedAnimation<Color>(TaskDesign.primary),
+          ),
+        ),
+      );
+    }
+
+    if (_task.isEmpty) {
+      return Scaffold(
+        backgroundColor: TaskDesign.bg,
+        body: SafeArea(
+          child: Column(
+            children: [
+              _buildHeader(),
+              Expanded(
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 72,
+                        height: 72,
+                        decoration: const BoxDecoration(
+                          color: TaskDesign.dangerSoft,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.error_outline_rounded,
+                          color: TaskDesign.danger,
+                          size: 36,
+                        ),
+                      ),
+                      const SizedBox(height: TaskDesign.lg),
+                      const Text(
+                        'Task not found',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: TaskDesign.textPrimary,
+                          letterSpacing: -0.4,
+                        ),
+                      ),
+                      const SizedBox(height: TaskDesign.lg),
+                      SizedBox(
+                        height: 48,
+                        child: ElevatedButton.icon(
+                          onPressed: _loadTask,
+                          icon: const Icon(Icons.refresh_rounded, size: 18),
+                          label: const Text('Retry'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: TaskDesign.primary,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(
+                                TaskDesign.radiusMd,
+                              ),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: TaskDesign.lg,
+                            ),
+                            textStyle: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final dueDate = _task['dueDate'] != null
+        ? DateTime.tryParse(_task['dueDate'].toString())
+        : null;
+    final isOverdue = dueDate != null &&
+        dueDate.isBefore(DateTime.now()) &&
+        _task['status'] != 'completed';
+    final comments = (_task['comments'] as List?) ?? const [];
+    final isCompleted = _task['status'] == 'completed';
+
+    final categoryKey =
+    (_task['category']?.toString() ?? 'general').toLowerCase();
+    final catMeta = _categoryMeta[categoryKey] ?? _categoryMeta['general']!;
+    final catFg = catMeta['fg'] as Color;
+    final catSoft = catMeta['soft'] as Color;
+    final catBorder = catMeta['border'] as Color;
+    final catLabel = catMeta['label'] as String;
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        backgroundColor: TaskDesign.bg,
+        body: Column(
+          children: [
+            _buildHeader(isCompleted: isCompleted),
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Task info card
+                    Padding(
+                      padding: const EdgeInsets.all(TaskDesign.md),
+                      child: _buildTaskInfoCard(
+                        isOverdue: isOverdue,
+                        catFg: catFg,
+                        catSoft: catSoft,
+                        catBorder: catBorder,
+                        catLabel: catLabel,
+                        isCompleted: isCompleted,
+                      ),
+                    ),
+
+                    // Discussion header
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: TaskDesign.md,
+                      ),
+                      child: _buildDiscussionHeader(comments.length),
+                    ),
+
+                    const SizedBox(height: TaskDesign.sm + 4),
+
+                    // Comments
+                    Container(
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: TaskDesign.md,
+                      ),
+                      decoration: BoxDecoration(
+                        color: TaskDesign.surface,
+                        borderRadius:
+                        BorderRadius.circular(TaskDesign.radiusLg),
+                        border:
+                        Border.all(color: TaskDesign.border, width: 1),
+                        boxShadow: TaskDesign.softShadow,
+                      ),
+                      child: comments.isEmpty
+                          ? _buildEmptyComments()
+                          : Column(
+                        children: [
+                          const SizedBox(height: TaskDesign.sm),
+                          ...comments.asMap().entries.map((e) {
+                            final c = e.value;
+                            if (c is! Map) {
+                              return const SizedBox.shrink();
+                            }
+                            return _buildChatBubble(
+                              Map<String, dynamic>.from(c),
+                            );
+                          }),
+                          const SizedBox(height: TaskDesign.sm),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: TaskDesign.md),
+
+                    // Comment input
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: TaskDesign.md,
+                      ),
+                      child: _buildCommentInput(),
+                    ),
+
+                    const SizedBox(height: TaskDesign.lg),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ===================== HEADER =====================
+
+  Widget _buildHeader({bool isCompleted = false}) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [TaskDesign.primary, TaskDesign.primaryDark],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: const BorderRadius.vertical(
+          bottom: Radius.circular(TaskDesign.radiusXl),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: TaskDesign.primary.withOpacity(0.25),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+            spreadRadius: -6,
+          ),
+        ],
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            TaskDesign.md,
+            TaskDesign.sm,
+            TaskDesign.md,
+            TaskDesign.md,
+          ),
+          child: Row(
+            children: [
+              Material(
+                color: Colors.white.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(TaskDesign.radiusSm),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(TaskDesign.radiusSm),
+                  onTap: () => Navigator.pop(context),
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    alignment: Alignment.center,
+                    child: const Icon(
+                      Icons.arrow_back_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: TaskDesign.sm + 4),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Task Details',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        letterSpacing: -0.4,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'View and discuss the task',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: Colors.white70,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (!isCompleted)
+                Material(
+                  color: Colors.white.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(TaskDesign.radiusSm),
+                  child: InkWell(
+                    borderRadius:
+                    BorderRadius.circular(TaskDesign.radiusSm),
+                    onTap: _isCompletingTask ? null : _markComplete,
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      alignment: Alignment.center,
+                      child: _isCompletingTask
+                          ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                          : const Icon(
+                        Icons.check_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                ),
+              const SizedBox(width: TaskDesign.sm),
+              Material(
+                color: Colors.white.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(TaskDesign.radiusSm),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(TaskDesign.radiusSm),
+                  onTap: _isRefreshing ? null : _refreshTask,
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    alignment: Alignment.center,
+                    child: _isRefreshing
+                        ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                        : const Icon(
+                      Icons.refresh_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===================== TASK INFO CARD =====================
+
+  Widget _buildTaskInfoCard({
+    required bool isOverdue,
+    required Color catFg,
+    required Color catSoft,
+    required Color catBorder,
+    required String catLabel,
+    required bool isCompleted,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(TaskDesign.md + 2),
+      decoration: BoxDecoration(
+        color: TaskDesign.surface,
+        borderRadius: BorderRadius.circular(TaskDesign.radiusLg),
+        border: Border.all(color: TaskDesign.border, width: 1),
+        boxShadow: TaskDesign.softShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Status + category pills
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: TaskDesign.sm + 2,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: isCompleted
+                      ? TaskDesign.successSoft
+                      : (isOverdue
+                      ? TaskDesign.dangerSoft
+                      : TaskDesign.warningSoft),
+                  borderRadius:
+                  BorderRadius.circular(TaskDesign.radiusSm),
+                  border: Border.all(
+                    color: isCompleted
+                        ? TaskDesign.successBorder
+                        : (isOverdue
+                        ? TaskDesign.dangerBorder
+                        : TaskDesign.warningBorder),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isCompleted
+                          ? Icons.check_circle_rounded
+                          : (isOverdue
+                          ? Icons.warning_rounded
+                          : Icons.access_time_rounded),
+                      color: isCompleted
+                          ? TaskDesign.success
+                          : (isOverdue
+                          ? TaskDesign.danger
+                          : TaskDesign.warning),
+                      size: 12,
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      isCompleted
+                          ? 'Completed'
+                          : (isOverdue ? 'Overdue' : 'Pending'),
+                      style: TextStyle(
+                        color: isCompleted
+                            ? TaskDesign.success
+                            : (isOverdue
+                            ? TaskDesign.danger
+                            : TaskDesign.warning),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.1,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: TaskDesign.sm + 2,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: catSoft,
+                  borderRadius: BorderRadius.circular(TaskDesign.radiusSm),
+                  border: Border.all(color: catBorder, width: 1),
+                ),
+                child: Text(
+                  catLabel,
+                  style: TextStyle(
+                    color: catFg,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.1,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: TaskDesign.md),
+
+          // Title
+          Text(
+            _task['title']?.toString() ?? 'No Title',
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: TaskDesign.textPrimary,
+              letterSpacing: -0.5,
+              height: 1.25,
+            ),
+          ),
+
+          // Description
+          if ((_task['description'] ?? '').toString().isNotEmpty) ...[
+            const SizedBox(height: TaskDesign.sm),
+            Text(
+              _task['description'].toString(),
+              style: const TextStyle(
+                fontSize: 13.5,
+                color: TaskDesign.textSecondary,
+                height: 1.55,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+
+          const SizedBox(height: TaskDesign.md),
+
+          // Divider
+          Container(height: 1, color: TaskDesign.border),
+
+          const SizedBox(height: TaskDesign.md),
+
+          // Info chips row
+          Wrap(
+            spacing: TaskDesign.sm,
+            runSpacing: TaskDesign.sm,
+            children: [
+              _buildInfoChip(
+                icon: Icons.calendar_today_rounded,
+                label: 'DUE DATE',
+                value: _task['dueDate'] != null
+                    ? _formatDate(_task['dueDate'].toString())
+                    : 'Not set',
+                fg: isOverdue ? TaskDesign.danger : TaskDesign.info,
+                soft: isOverdue
+                    ? TaskDesign.dangerSoft
+                    : TaskDesign.infoSoft,
+                border: isOverdue
+                    ? TaskDesign.dangerBorder
+                    : TaskDesign.infoBorder,
+              ),
+              _buildInfoChip(
+                icon: Icons.person_add_rounded,
+                label: 'ASSIGNED BY',
+                value: _displayName(_task['assigner']),
+                fg: TaskDesign.primary,
+                soft: TaskDesign.primarySoft,
+                border: TaskDesign.primaryLight,
+              ),
+              _buildInfoChip(
+                icon: Icons.person_rounded,
+                label: 'ASSIGNED TO',
+                value: _displayName(_task['assignee']),
+                fg: TaskDesign.success,
+                soft: TaskDesign.successSoft,
+                border: TaskDesign.successBorder,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildInfoChip({
     required IconData icon,
     required String label,
     required String value,
-    Color? color,
+    required Color fg,
+    required Color soft,
+    required Color border,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(
+        horizontal: TaskDesign.sm + 4,
+        vertical: TaskDesign.sm,
+      ),
       decoration: BoxDecoration(
-        color: (color ?? Colors.blueGrey).withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
+        color: soft,
+        borderRadius: BorderRadius.circular(TaskDesign.radiusSm),
+        border: Border.all(color: border, width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: color ?? Colors.blueGrey[700]),
+          Icon(icon, size: 13, color: fg),
           const SizedBox(width: 6),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -316,20 +902,113 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 10,
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.w500,
+                  fontSize: 9,
+                  color: fg.withOpacity(0.75),
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.6,
                 ),
               ),
+              const SizedBox(height: 1),
               Text(
                 value,
                 style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: color ?? Colors.blueGrey[700],
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w800,
+                  color: fg,
+                  letterSpacing: -0.1,
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ===================== DISCUSSION =====================
+
+  Widget _buildDiscussionHeader(int commentCount) {
+    return Row(
+      children: [
+        Container(
+          width: 3,
+          height: 14,
+          decoration: BoxDecoration(
+            color: TaskDesign.primary,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: TaskDesign.sm),
+        const Text(
+          'DISCUSSION',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            color: TaskDesign.textPrimary,
+            letterSpacing: 0.8,
+          ),
+        ),
+        const SizedBox(width: TaskDesign.sm),
+        Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 7,
+            vertical: 2,
+          ),
+          decoration: BoxDecoration(
+            color: TaskDesign.infoSoft,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: TaskDesign.infoBorder, width: 1),
+          ),
+          child: Text(
+            '$commentCount',
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              color: TaskDesign.info,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEmptyComments() {
+    return Padding(
+      padding: const EdgeInsets.all(TaskDesign.xl),
+      child: Column(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: TaskDesign.surfaceMuted,
+              shape: BoxShape.circle,
+              border: Border.all(color: TaskDesign.border, width: 1),
+            ),
+            child: const Icon(
+              Icons.chat_bubble_outline_rounded,
+              color: TaskDesign.textMuted,
+              size: 26,
+            ),
+          ),
+          const SizedBox(height: TaskDesign.md),
+          const Text(
+            'No comments yet',
+            style: TextStyle(
+              fontSize: 14,
+              color: TaskDesign.textPrimary,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.2,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Start the conversation',
+            style: TextStyle(
+              fontSize: 12,
+              color: TaskDesign.textMuted,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ],
       ),
@@ -337,102 +1016,136 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
   }
 
   Widget _buildChatBubble(Map<String, dynamic> comment) {
-    String authorName = 'Unknown';
-    bool isCurrentUser = false;
-    String authorId = '';
-
-    if (comment['author'] is Map) {
-      final author = comment['author'] as Map<String, dynamic>;
-      authorId = author['_id'] ?? '';
-      authorName = author['fullName'] ??
-          '${author['firstName'] ?? ''} ${author['lastName'] ?? ''}'.trim();
-      isCurrentUser = author['firstName'] == 'You' ||
-          author['fullName'] == 'You' ||
-          authorId == widget.currentUserId;
-    }
+    final author = comment['author'] is Map
+        ? Map<String, dynamic>.from(comment['author'])
+        : <String, dynamic>{};
+    final authorId = author['_id']?.toString() ?? '';
+    final authorName = (author['fullName'] ??
+        '${author['firstName'] ?? ''} ${author['lastName'] ?? ''}')
+        .toString()
+        .trim();
+    final isMe = authorId == widget.currentUserId;
+    final initials =
+    authorName.isNotEmpty ? authorName[0].toUpperCase() : '?';
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      padding: const EdgeInsets.symmetric(
+        horizontal: TaskDesign.md,
+        vertical: TaskDesign.sm - 2,
+      ),
       child: Row(
         mainAxisAlignment:
-        isCurrentUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          if (!isCurrentUser) ...[
-            CircleAvatar(
-              backgroundColor: Colors.grey[300],
-              radius: 16,
-              child: Text(
-                authorName.isNotEmpty ? authorName[0].toUpperCase() : '?',
-                style: TextStyle(
-                  color: Colors.grey[700],
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
+          if (!isMe) ...[
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: TaskDesign.surfaceMuted,
+                shape: BoxShape.circle,
+                border: Border.all(color: TaskDesign.border, width: 1),
+              ),
+              child: Center(
+                child: Text(
+                  initials,
+                  style: const TextStyle(
+                    color: TaskDesign.textSecondary,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12,
+                  ),
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: TaskDesign.sm),
           ],
           Flexible(
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding: const EdgeInsets.symmetric(
+                horizontal: TaskDesign.md - 2,
+                vertical: TaskDesign.sm + 2,
+              ),
               decoration: BoxDecoration(
-                color: isCurrentUser ? Colors.blue[600] : Colors.grey[200],
+                color: isMe ? TaskDesign.primary : TaskDesign.surfaceMuted,
                 borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(16),
-                  topRight: const Radius.circular(16),
-                  bottomLeft: Radius.circular(isCurrentUser ? 16 : 4),
-                  bottomRight: Radius.circular(isCurrentUser ? 4 : 16),
+                  topLeft: const Radius.circular(TaskDesign.radiusMd),
+                  topRight: const Radius.circular(TaskDesign.radiusMd),
+                  bottomLeft: Radius.circular(
+                    isMe ? TaskDesign.radiusMd : 4,
+                  ),
+                  bottomRight: Radius.circular(
+                    isMe ? 4 : TaskDesign.radiusMd,
+                  ),
                 ),
+                border: isMe
+                    ? null
+                    : Border.all(color: TaskDesign.border, width: 1),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (!isCurrentUser)
+                  if (!isMe && authorName.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 4),
                       child: Text(
                         authorName,
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                          color: Colors.grey[700],
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 11.5,
+                          color: TaskDesign.textPrimary,
+                          letterSpacing: -0.1,
                         ),
                       ),
                     ),
                   Text(
-                    comment['text'] ?? '',
+                    comment['text']?.toString() ?? '',
                     style: TextStyle(
-                      color: isCurrentUser ? Colors.white : Colors.black87,
-                      fontSize: 15,
-                      height: 1.4,
+                      color: isMe
+                          ? Colors.white
+                          : TaskDesign.textPrimary,
+                      fontSize: 13.5,
+                      height: 1.45,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    _formatTime(comment['createdAt']),
+                    _formatTime(comment['createdAt']?.toString()),
                     style: TextStyle(
                       fontSize: 10,
-                      color: isCurrentUser
-                          ? Colors.white.withOpacity(0.7)
-                          : Colors.grey[600],
+                      color: isMe
+                          ? Colors.white.withOpacity(0.75)
+                          : TaskDesign.textMuted,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.1,
                     ),
                   ),
                 ],
               ),
             ),
           ),
-          if (isCurrentUser) ...[
-            const SizedBox(width: 8),
-            CircleAvatar(
-              backgroundColor: Colors.blue[700],
-              radius: 16,
-              child: Text(
-                authorName.isNotEmpty ? authorName[0].toUpperCase() : '?',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
+          if (isMe) ...[
+            const SizedBox(width: TaskDesign.sm),
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: TaskDesign.primaryDark,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: TaskDesign.primaryLight,
+                  width: 1,
+                ),
+              ),
+              child: Center(
+                child: Text(
+                  initials,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12,
+                  ),
                 ),
               ),
             ),
@@ -442,404 +1155,101 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    if (_isLoading) {
-      return Scaffold(
-        backgroundColor: Colors.grey[50],
-        appBar: AppBar(
-          title: const Text('Task Details'),
-          centerTitle: true,
-          backgroundColor: Colors.blue[700],
-          foregroundColor: Colors.white,
-          elevation: 0,
-        ),
-        body: const Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
+  // ===================== COMMENT INPUT =====================
 
-    if (_task.isEmpty) {
-      return Scaffold(
-        backgroundColor: Colors.grey[50],
-        appBar: AppBar(
-          title: const Text('Task Details'),
-          centerTitle: true,
-          backgroundColor: Colors.blue[700],
-          foregroundColor: Colors.white,
-          elevation: 0,
-        ),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error_outline, size: 60, color: Colors.grey[400]),
-              const SizedBox(height: 20),
-              Text(
-                'Task not found',
-                style: TextStyle(fontSize: 18, color: Colors.grey[600]),
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton.icon(
-                onPressed: _loadTask,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Retry'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue[700],
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    final isOverdue = _task['dueDate'] != null &&
-        DateTime.parse(_task['dueDate']).isBefore(DateTime.now()) &&
-        _task['status'] != 'completed';
-
-    final categoryColor = _getCategoryColor(_task['category']);
-
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        title: const Text('Task Details'),
-        centerTitle: true,
-        backgroundColor: Colors.blue[700],
-        foregroundColor: Colors.white,
-        elevation: 0,
-        actions: [
-          if (_task['status'] != 'completed')
-            IconButton(
-              icon: _isCompletingTask
-                  ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
-                  : const Icon(Icons.check_circle_outline),
-              onPressed: _isCompletingTask ? null : _markComplete,
-              tooltip: 'Mark Complete',
-            ),
-          IconButton(
-            icon: _isRefreshing
-                ? const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: Colors.white,
-              ),
-            )
-                : const Icon(Icons.refresh),
-            onPressed: _isRefreshing ? null : _refreshTask,
-            tooltip: 'Refresh',
-          ),
-        ],
+  Widget _buildCommentInput() {
+    return Container(
+      decoration: BoxDecoration(
+        color: TaskDesign.surface,
+        borderRadius: BorderRadius.circular(TaskDesign.radiusLg),
+        border: Border.all(color: TaskDesign.border, width: 1),
+        boxShadow: TaskDesign.softShadow,
       ),
-      body: Column(
+      padding: const EdgeInsets.all(TaskDesign.sm + 2),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          // Task Header Card
-          Container(
-            width: double.infinity,
-            margin: const EdgeInsets.all(12),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 4,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: categoryColor,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _task['title'] ?? 'No Title',
-                            style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _task['category'] ?? 'general',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: categoryColor,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: _task['status'] == 'completed'
-                            ? Colors.green
-                            : Colors.orange,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        (_task['status'] ?? 'open').toString().toUpperCase(),
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                if (_task['description'] != null &&
-                    _task['description'].toString().isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    _task['description'].toString(),
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: Colors.grey[700],
-                      height: 1.5,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 16),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _buildInfoChip(
-                      icon: Icons.calendar_today,
-                      label: 'Due Date',
-                      value: _task['dueDate'] != null
-                          ? _formatDate(_task['dueDate'])
-                          : 'Not set',
-                      color: isOverdue ? Colors.red : null,
-                    ),
-                    _buildInfoChip(
-                      icon: Icons.person_add,
-                      label: 'Assigned By',
-                      value: _task['assigner'] != null
-                          ? '${_task['assigner']['firstName'] ?? ''} ${_task['assigner']['lastName'] ?? ''}'
-                          .trim()
-                          : 'Unknown',
-                    ),
-                    _buildInfoChip(
-                      icon: Icons.person,
-                      label: 'Assigned To',
-                      value: _task['assignee'] != null
-                          ? '${_task['assignee']['firstName'] ?? ''} ${_task['assignee']['lastName'] ?? ''}'
-                          .trim()
-                          : 'Unknown',
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          // Chat Section Header
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.blue[50],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(Icons.forum, color: Colors.blue[700], size: 20),
-                ),
-                const SizedBox(width: 12),
-                const Text(
-                  'Discussion',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.blue[700],
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    '${(_task['comments'] as List).length}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Chat Messages Area
           Expanded(
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(24),
-                  topRight: Radius.circular(24),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, -2),
-                  ),
-                ],
+                color: TaskDesign.surfaceMuted,
+                borderRadius: BorderRadius.circular(TaskDesign.radiusMd),
+                border: Border.all(color: TaskDesign.border, width: 1),
               ),
-              child: Column(
-                children: [
-                  const SizedBox(height: 8),
-                  Expanded(
-                    child: (_task['comments'] as List).isEmpty
-                        ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.chat_bubble_outline,
-                            color: Colors.grey[300],
-                            size: 64,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'No comments yet',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.grey[500],
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Start the conversation',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[400],
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                        : ListView.builder(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      itemCount: (_task['comments'] as List).length,
-                      itemBuilder: (context, index) {
-                        return _buildChatBubble(
-                            _task['comments'][index]);
-                      },
-                    ),
+              child: TextField(
+                controller: _commentController,
+                focusNode: _commentFocusNode,
+                maxLines: 4,
+                minLines: 1,
+                style: const TextStyle(
+                  fontSize: 13.5,
+                  color: TaskDesign.textPrimary,
+                  fontWeight: FontWeight.w500,
+                  height: 1.45,
+                ),
+                decoration: const InputDecoration(
+                  hintText: 'Type a message...',
+                  hintStyle: TextStyle(
+                    color: TaskDesign.textMuted,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
                   ),
-                  // Input Area
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[50],
-                      border: Border(
-                        top: BorderSide(color: Colors.grey[200]!),
-                      ),
-                    ),
-                    child: SafeArea(
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(24),
-                                border: Border.all(color: Colors.grey[300]!),
-                              ),
-                              child: TextField(
-                                controller: _commentController,
-                                focusNode: _commentFocusNode,
-                                maxLines: 4,
-                                minLines: 1,
-                                decoration: InputDecoration(
-                                  hintText: 'Type a message...',
-                                  hintStyle: TextStyle(color: Colors.grey[400]),
-                                  border: InputBorder.none,
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 10,
-                                  ),
-                                ),
-                                onChanged: (value) {
-                                  if (mounted) setState(() {});
-                                },
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: _commentController.text.trim().isEmpty
-                                  ? Colors.grey[300]
-                                  : Colors.blue[700],
-                              shape: BoxShape.circle,
-                            ),
-                            child: IconButton(
-                              onPressed: _isAddingComment ||
-                                  _commentController.text.trim().isEmpty
-                                  ? null
-                                  : _addComment,
-                              icon: _isAddingComment
-                                  ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                                  : const Icon(Icons.send, size: 20),
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: TaskDesign.md - 2,
+                    vertical: TaskDesign.sm + 4,
                   ),
-                ],
+                ),
+                onChanged: (_) {
+                  if (mounted) setState(() {});
+                },
+              ),
+            ),
+          ),
+          const SizedBox(width: TaskDesign.sm),
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: _commentController.text.trim().isEmpty
+                  ? TaskDesign.surfaceMuted
+                  : TaskDesign.primary,
+              borderRadius: BorderRadius.circular(TaskDesign.radiusMd),
+              border: Border.all(
+                color: _commentController.text.trim().isEmpty
+                    ? TaskDesign.border
+                    : TaskDesign.primary,
+                width: 1,
+              ),
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(TaskDesign.radiusMd),
+                onTap: _isAddingComment ||
+                    _commentController.text.trim().isEmpty
+                    ? null
+                    : _addComment,
+                child: Center(
+                  child: _isAddingComment
+                      ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Colors.white,
+                      ),
+                    ),
+                  )
+                      : Icon(
+                    Icons.send_rounded,
+                    size: 18,
+                    color: _commentController.text.trim().isEmpty
+                        ? TaskDesign.textMuted
+                        : Colors.white,
+                  ),
+                ),
               ),
             ),
           ),

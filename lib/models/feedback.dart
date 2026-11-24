@@ -5,8 +5,8 @@ class FeedbackModel {
 
   FeedbackModel({
     required this.message,
-    this.category = 'other',
-    this.isAnonymous = false,
+    required this.category,
+    required this.isAnonymous,
   });
 
   Map<String, dynamic> toJson() => {
@@ -14,4 +14,10 @@ class FeedbackModel {
     'category': category,
     'isAnonymous': isAnonymous,
   };
+
+  factory FeedbackModel.fromJson(Map<String, dynamic> json) => FeedbackModel(
+    message: json['message'] ?? '',
+    category: json['category'] ?? 'other',
+    isAnonymous: json['isAnonymous'] ?? false,
+  );
 }
