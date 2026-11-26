@@ -45,5 +45,55 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+
+	<!-- ==================== PERMISSIONS ==================== -->
+	<!-- Camera Permission: Face biometric punch-in, profile picture, document scan -->
+	<key>NSCameraUsageDescription</key>
+	<string>StaffSync requires camera access for facial biometric attendance verification, profile photo capture, and document scanning.</string>
+
+	<!-- Location Permissions: Office geofencing for check-in / check-out -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>StaffSync requires location access to verify your presence within the designated office geofence for attendance punch-in.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>StaffSync requires location access to verify geofenced office premises during work shifts.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>StaffSync requires location access to confirm geofenced workplace attendance.</string>
+
+	<!-- Biometrics: Local authentication & App Lock -->
+	<key>NSFaceIDUsageDescription</key>
+	<string>StaffSync requires Face ID authentication to securely unlock the application and protect employee records.</string>
+
+	<!-- Photo Library Permissions: Uploading documents, receipts & saving payslips -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>StaffSync requires access to your photo library to upload expense receipts, verification documents, and profile photos.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>StaffSync requires permission to save downloaded salary slips and company reports to your photos.</string>
+
+	<!-- Microphone: WebRTC team audio/video calls -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>StaffSync requires microphone access for audio and video communication during team calls.</string>
+
+	<!-- ==================== NETWORK & BACKGROUND ==================== -->
+	<!-- App Transport Security: Allows connecting to staging / local development servers -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+
+	<!-- Background Modes: Push notifications and fetch -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>remote-notification</string>
+	</array>
+
+	<!-- File Sharing & Documents -->
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
+	<key>UIFileSharingEnabled</key>
+	<true/>
 </dict>
 </plist>

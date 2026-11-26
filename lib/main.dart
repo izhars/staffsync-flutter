@@ -8,17 +8,24 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // ── Firebase ──────────────────────────────────────────────────
-  await Firebase.initializeApp();
+  try {
+    await Firebase.initializeApp();
+    // ── Background FCM entry point (registered ONCE, top-level fn). ─
+    FirebaseMessaging.onBackgroundMessage(firebaseBackgroundMessageHandler);
+  } catch (e) {
+    debugPrint('Firebase initialization warning: $e');
+  }
 
   // ── Local notification channels + plugin ──────────────────────
   await NotificationService.initialize();
 
-  // ── Background FCM entry point (registered ONCE, top-level fn). ─
-  FirebaseMessaging.onBackgroundMessage(firebaseBackgroundMessageHandler);
-
   // ── Foreground / opened-app listeners + permission + token save. ──
   final notificationService = NotificationService();
-  await notificationService.init();
+  try {
+    await notificationService.init();
+  } catch (e) {
+    debugPrint('NotificationService init warning: $e');
+  }
 
   // ── Cold-start notification (consumed once by SplashScreen). ────
   final initialNotificationData =

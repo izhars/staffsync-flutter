@@ -1,19 +1,28 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../app/constants.dart';
 
 class ApiService {
   static const String baseUrl = AppConstants.apiBaseUrl;
   static const Duration timeout = AppConstants.apiTimeout;
+  static const FlutterSecureStorage _storage = FlutterSecureStorage();
+
+  Future<Map<String, String>> _getHeaders(Map<String, String>? headers) async {
+    final orgCode = await _storage.read(key: 'organization_code');
+    return {
+      'Content-Type': 'application/json',
+      if (orgCode != null && orgCode.isNotEmpty) 'x-organization-code': orgCode,
+      ...?headers,
+    };
+  }
 
   Future<Map<String, dynamic>> get(String endpoint, {Map<String, String>? headers}) async {
     try {
+      final reqHeaders = await _getHeaders(headers);
       final response = await http.get(
         Uri.parse('$baseUrl$endpoint'),
-        headers: {
-          'Content-Type': 'application/json',
-          ...?headers,
-        },
+        headers: reqHeaders,
       ).timeout(timeout);
 
       return _handleResponse(response);
@@ -24,12 +33,10 @@ class ApiService {
 
   Future<Map<String, dynamic>> post(String endpoint, dynamic data, {Map<String, String>? headers}) async {
     try {
+      final reqHeaders = await _getHeaders(headers);
       final response = await http.post(
         Uri.parse('$baseUrl$endpoint'),
-        headers: {
-          'Content-Type': 'application/json',
-          ...?headers,
-        },
+        headers: reqHeaders,
         body: jsonEncode(data),
       ).timeout(timeout);
 
@@ -41,12 +48,10 @@ class ApiService {
 
   Future<Map<String, dynamic>> put(String endpoint, dynamic data, {Map<String, String>? headers}) async {
     try {
+      final reqHeaders = await _getHeaders(headers);
       final response = await http.put(
         Uri.parse('$baseUrl$endpoint'),
-        headers: {
-          'Content-Type': 'application/json',
-          ...?headers,
-        },
+        headers: reqHeaders,
         body: jsonEncode(data),
       ).timeout(timeout);
 
@@ -58,12 +63,10 @@ class ApiService {
 
   Future<Map<String, dynamic>> delete(String endpoint, {Map<String, String>? headers}) async {
     try {
+      final reqHeaders = await _getHeaders(headers);
       final response = await http.delete(
         Uri.parse('$baseUrl$endpoint'),
-        headers: {
-          'Content-Type': 'application/json',
-          ...?headers,
-        },
+        headers: reqHeaders,
       ).timeout(timeout);
 
       return _handleResponse(response);

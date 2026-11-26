@@ -20,6 +20,8 @@ class AuthService {
   static const _userIdKey = 'id';
   static const _fcmTokenKey = 'fcm_token';
   static const _deviceIdKey = 'device_id';
+  static const _orgCodeKey = 'organization_code';
+  static const _orgDataKey = 'organization_data';
   static const _verificationStatusKey = 'verification_status';
   static const _lastVerificationCheckKey = 'last_verification_check';
   static const _lastActivityKey = 'last_activity';
@@ -123,10 +125,11 @@ class AuthService {
   // ==================== AUTHENTICATION METHODS ====================
 
   /// Login user with comprehensive error handling
-  Future<User?> login(String employeeId, String password, {String? fcmToken}) async {
+  Future<User?> login(String employeeId, String password, {String? fcmToken, String? organizationCode}) async {
     try {
       final deviceId = await getDeviceId();
       final url = Uri.parse('${AppConstants.apiBaseUrl}/auth/login');
+      final effectiveOrgCode = organizationCode ?? await getOrganizationCode();
 
       final Map<String, dynamic> body = {
         'employeeId': employeeId.trim().toUpperCase(),
@@ -139,6 +142,10 @@ class AuthService {
             : 'web',
         'deviceInfo': await getDeviceInfo(),
       };
+
+      if (effectiveOrgCode != null && effectiveOrgCode.trim().isNotEmpty) {
+        body['organizationCode'] = effectiveOrgCode.trim().toUpperCase();
+      }
 
       // Add FCM token if available
       if (fcmToken != null && fcmToken.isNotEmpty) {
@@ -193,6 +200,14 @@ class AuthService {
 
       // Store auth data
       await _storeAuthData(token, user, data['user']);
+
+      // Store organization data if present
+      if (data['organization'] != null) {
+        await setOrganizationData(data['organization']);
+        if (data['organization']['companyCode'] != null) {
+          await setOrganizationCode(data['organization']['companyCode']);
+        }
+      }
 
       // Store FCM token locally if provided
       if (fcmToken != null && fcmToken.isNotEmpty) {
@@ -1143,17 +1158,64 @@ class AuthService {
   Future<String?> getUserProfilePicture() async => getUserStringField('profilePicture');
   Future<String?> getUserDeviceId() async => getUserStringField('deviceId');
 
+  // ==================== ORGANIZATION METHODS ====================
+
+  Future<String?> getOrganizationCode() async {
+    return await _secureStorage.read(key: _orgCodeKey);
+  }
+
+  Future<void> setOrganizationCode(String code) async {
+    await _secureStorage.write(key: _orgCodeKey, value: code.trim().toUpperCase());
+  }
+
+  Future<Map<String, dynamic>?> getOrganizationData() async {
+    final raw = await _secureStorage.read(key: _orgDataKey);
+    if (raw == null) return null;
+    try {
+      return jsonDecode(raw) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> setOrganizationData(Map<String, dynamic> data) async {
+    await _secureStorage.write(key: _orgDataKey, value: jsonEncode(data));
+  }
+
+  Future<Map<String, dynamic>?> resolveOrganization(String codeOrSlug) async {
+    try {
+      final url = Uri.parse('${AppConstants.apiBaseUrl}/organizations/resolve/${codeOrSlug.trim()}');
+      final response = await http.get(url, headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      }).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true && data['data'] != null) {
+          return data['data'] as Map<String, dynamic>;
+        }
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error resolving organization: $e');
+      return null;
+    }
+  }
+
   // ==================== PRIVATE METHODS ====================
 
   Future<Map<String, String>> _buildHeaders() async {
     final token = await getToken();
     final deviceId = await getDeviceId();
+    final orgCode = await getOrganizationCode();
     final packageInfo = await PackageInfo.fromPlatform();
 
     return {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
       if (token != null) 'Authorization': 'Bearer $token',
+      if (orgCode != null && orgCode.isNotEmpty) 'x-organization-code': orgCode,
       'X-App-Version': packageInfo.version,
       'device-id': deviceId,
     };

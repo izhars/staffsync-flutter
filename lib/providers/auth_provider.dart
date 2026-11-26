@@ -32,6 +32,7 @@ class AuthProvider with ChangeNotifier {
       String employeeId,
       String password, {
         String? fcmToken,
+        String? organizationCode,
       }) async {
     _isLoading = true;
     _error = null;
@@ -43,6 +44,7 @@ class AuthProvider with ChangeNotifier {
         employeeId,
         password,
         fcmToken: fcmToken ?? _fcmToken,
+        organizationCode: organizationCode,
       );
       _isLoading = false;
       notifyListeners();
@@ -95,6 +97,10 @@ class AuthProvider with ChangeNotifier {
 
   Future<String> resendTwoFactorCode(String ticket) {
     return _authService.resendTwoFactorCode(ticket: ticket);
+  }
+
+  Future<Map<String, dynamic>?> resolveOrganization(String codeOrSlug) {
+    return _authService.resolveOrganization(codeOrSlug);
   }
 
   /// Update FCM token on server

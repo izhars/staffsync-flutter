@@ -7,7 +7,6 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:staffsync/app/sidebar.dart';
 import 'package:staffsync/screens/announcement_screen.dart';
 import 'package:staffsync/screens/combo_off_screen.dart';
-import 'package:staffsync/screens/notification_screen.dart';
 import 'package:staffsync/screens/payroll_screen.dart';
 import '../../app/app_screen.dart';
 import '../../component/announcements_home_widget.dart';
@@ -31,7 +30,6 @@ import '../../widgets/day_time_widget.dart';
 import '../../widgets/update_banner.dart';
 import '../chat_home_screen.dart';
 import '../face/face_capture_screen.dart';
-import '../feedback_screen.dart';
 import '../poll_screen.dart';
 import '../award_screen.dart';
 import '../celebration_screen.dart';
@@ -209,25 +207,11 @@ class _DashboardScreenState extends State<DashboardScreen>
       screen: AppScreen.polls,
     ),
     _QuickAction(
-      title: "Support",
-      gif: "assets/gifs/customer-service.gif",
-      gradient: [Color(0xFFFFCC80), Color(0xFFFFF3E0)],
-      icon: Color(0xFFFB8C00),
-      screen: AppScreen.support,
-    ),
-    _QuickAction(
       title: "Announcement",
       gif: "assets/gifs/marketing.gif",
       gradient: [Color(0xFFF48FB1), Color(0xFFFCE4EC)],
       icon: Color(0xFFD81B60),
       screen: AppScreen.announcement,
-    ),
-    _QuickAction(
-      title: "Feedback",
-      gif: "assets/gifs/feedback.gif",
-      gradient: [Color(0xFFFFE082), Color(0xFFFFF8E1)],
-      icon: Color(0xFFFFB300),
-      screen: AppScreen.feedback,
     ),
     _QuickAction(
       title: "Combo Off",
@@ -242,13 +226,6 @@ class _DashboardScreenState extends State<DashboardScreen>
       gradient: [Color(0xFFBCAAA4), Color(0xFFEFEBE9)],
       icon: Color(0xFF6D4C41),
       screen: AppScreen.award,
-    ),
-    _QuickAction(
-      title: "Notification",
-      gif: "assets/gifs/notification.gif",
-      gradient: [Color(0xFF80DEEA), Color(0xFFE0F7FA)],
-      icon: Color(0xFF00ACC1),
-      screen: AppScreen.notification,
     ),
   ];
 
@@ -724,7 +701,7 @@ class _DashboardScreenState extends State<DashboardScreen>
 
     setState(() => _isAttendanceLoading = true);
 
-    final fresh = await LocationService.getCurrentLocation();
+    final fresh = _currentLatLng ?? await LocationService.getCurrentLocation();
     if (fresh == null) {
       setState(() => _isAttendanceLoading = false);
       _showSnackBar("Location not available. Try again.", Colors.red.shade400);
@@ -736,7 +713,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       final validation = await _geoFenceService.validateLocation(
         latitude: _currentLatLng!.latitude,
         longitude: _currentLatLng!.longitude,
-        forceRefresh: true,
+        forceRefresh: false, // Fast-path: use cached fences to eliminate blocking HTTP roundtrip
       );
 
       if (!validation.isInside) {
@@ -814,7 +791,7 @@ class _DashboardScreenState extends State<DashboardScreen>
 
     setState(() => _isAttendanceLoading = true);
 
-    final fresh = await LocationService.getCurrentLocation();
+    final fresh = _currentLatLng ?? await LocationService.getCurrentLocation();
     if (fresh == null) {
       setState(() => _isAttendanceLoading = false);
       _showSnackBar("Location not available. Try again.", Colors.red.shade400);
@@ -826,7 +803,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       final validation = await _geoFenceService.validateLocation(
         latitude: _currentLatLng!.latitude,
         longitude: _currentLatLng!.longitude,
-        forceRefresh: true,
+        forceRefresh: false, // Fast-path: use cached fences to eliminate blocking HTTP roundtrip
       );
 
       if (!validation.isInside) {
@@ -1211,12 +1188,9 @@ class _DashboardScreenState extends State<DashboardScreen>
     AppScreen.payroll: PayrollListScreen(),
     AppScreen.holiday: PremiumHolidayCalendar(),
     AppScreen.polls: PollScreen(),
-    AppScreen.support: ChatHomeScreen(),
     AppScreen.announcement: AnnouncementsPage(),
-    AppScreen.feedback: FeedbackScreen(),
     AppScreen.combooff: ComboOffScreen(),
     AppScreen.award: AwardScreen(),
-    AppScreen.notification: NotificationScreen(),
   };
 
   String _getStatusTitle() {

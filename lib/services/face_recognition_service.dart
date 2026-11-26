@@ -18,8 +18,12 @@ class FaceSample {
 }
 
 class FaceRecognitionService {
-  late Interpreter _interpreter;
-  Interpreter? _spoofInterpreter;
+  static Interpreter? _cachedInterpreter;
+  static Interpreter? _cachedSpoofInterpreter;
+  static bool _staticLoaded = false;
+
+  Interpreter get _interpreter => _cachedInterpreter!;
+  Interpreter? get _spoofInterpreter => _cachedSpoofInterpreter;
 
   final FaceDetector _detector = FaceDetector(
     options: FaceDetectorOptions(
@@ -32,7 +36,7 @@ class FaceRecognitionService {
   );
 
   static const int _inputSize = 112;
-  bool _loaded = false;
+  bool get isLoaded => _staticLoaded;
 
   // --- Anti-spoof (Silent-Face MiniFASNet) ---------------------------------
   // Put the converted model at this asset path and list it in pubspec.yaml.
@@ -43,15 +47,15 @@ class FaceRecognitionService {
   // Output classes are [other, real, spoof] (or [spoof, real]) -> index 1.
   static const int _spoofRealIndex = 1;
 
-  bool get antiSpoofAvailable => _spoofInterpreter != null;
+  bool get antiSpoofAvailable => _cachedSpoofInterpreter != null;
 
   Future<void> loadModel() async {
-    if (_loaded) return;
-    _interpreter = await Interpreter.fromAsset('assets/models/mobilefacenet.tflite');
-    _loaded = true;
+    if (_staticLoaded && _cachedInterpreter != null) return;
+    _cachedInterpreter = await Interpreter.fromAsset('assets/models/mobilefacenet.tflite');
+    _staticLoaded = true;
 
-    final inTensor = _interpreter.getInputTensor(0);
-    final outTensor = _interpreter.getOutputTensor(0);
+    final inTensor = _cachedInterpreter!.getInputTensor(0);
+    final outTensor = _cachedInterpreter!.getOutputTensor(0);
     print('MODEL INPUT: shape=${inTensor.shape} type=${inTensor.type}');
     print('MODEL OUTPUT: shape=${outTensor.shape} type=${outTensor.type}');
 
@@ -59,14 +63,15 @@ class FaceRecognitionService {
   }
 
   Future<void> _loadSpoofModel() async {
+    if (_cachedSpoofInterpreter != null) return;
     try {
-      _spoofInterpreter = await Interpreter.fromAsset(_spoofAsset);
-      final i = _spoofInterpreter!.getInputTensor(0);
-      final o = _spoofInterpreter!.getOutputTensor(0);
+      _cachedSpoofInterpreter = await Interpreter.fromAsset(_spoofAsset);
+      final i = _cachedSpoofInterpreter!.getInputTensor(0);
+      final o = _cachedSpoofInterpreter!.getOutputTensor(0);
       print('SPOOF INPUT: shape=${i.shape} type=${i.type}');
       print('SPOOF OUTPUT: shape=${o.shape} type=${o.type}');
     } catch (e) {
-      _spoofInterpreter = null;
+      _cachedSpoofInterpreter = null;
       print('WARNING: anti-spoof model not loaded ($e). Spoof check is OFF.');
     }
   }
@@ -394,7 +399,6 @@ class FaceRecognitionService {
 
   void dispose() {
     _detector.close();
-    if (_loaded) _interpreter.close();
-    _spoofInterpreter?.close();
+    // Keep static model interpreters cached in memory across screens for instant reuse
   }
 }

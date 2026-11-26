@@ -2,16 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:staffsync/screens/feedback_screen.dart';
 import 'package:staffsync/screens/privacy_permissions_screen.dart';
 import '../providers/theme_provider.dart';
 import '../services/notification_preference_service.dart';
+import 'about_page.dart';
 import 'appearance_screen.dart';
 import 'app_update_screen.dart';
+import 'faq_screen.dart';
+import 'help_and_support.dart';
 import 'my_shift_screen.dart';
 import 'ChangePasswordPage.dart';
 import 'devices_page.dart';
 import 'notification_settings_page.dart';
 import 'office_location_screen.dart';
+import 'face/face_enrollment_screen.dart';
+import 'face/face_test_menu_screen.dart';
+import 'onboarding_screen.dart';
+import 'payroll_screen.dart';
+import 'policy_screen.dart';
+import 'profile_screen.dart';
 
 // ===================== DESIGN TOKENS =====================
 class SettingsDesign {
@@ -280,15 +290,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   void _openNotifications() => _push(const NotificationSettingsPage());
 
-  void _openProfile() => _push(
-    const _StubPage(
-      title: 'Profile Information',
-      icon: Icons.person_outline_rounded,
-      description:
-      'View and edit name, photo, employee ID, department, designation, '
-          'reporting manager, joining date and emergency contacts.',
-    ),
-  );
+  void _openProfile() => _push(const ProfileScreen());
 
   void _openPrivacy() => _push(const PrivacyPermissionsScreen());
 
@@ -298,40 +300,19 @@ class _SettingsPageState extends State<SettingsPage> {
 
   void _openNewBuild() => _push(const AppUpdateScreen());
 
-  void _openDocuments() => _push(
-    const _StubPage(
-      title: 'My Documents',
-      icon: Icons.folder_outlined,
-      description:
-      'Employment documents, verification status and pending onboarding items.',
-    ),
-  );
+  void _openDocuments() => _push(const OnboardingScreen());
 
-  void _openPayslips() => _push(
-    const _StubPage(
-      title: 'Salary Slips',
-      icon: Icons.receipt_long_outlined,
-      description: 'Download monthly payslips and view compensation history.',
-    ),
-  );
+  void _openPayslips() => _push(const PayrollListScreen());
 
-  void _openPolicies() => _push(
-    const _StubPage(
-      title: 'Company Policies',
-      icon: Icons.menu_book_outlined,
-      description: 'Employee handbook, HR policies and code of conduct.',
-    ),
-  );
+  void _openPolicies() => _push(const PolicyScreen());
+
+  void _openFaceEnrollment() => _push(const FaceEnrollmentScreen());
+
+  void _openFaceTestMenu() => _push(const FaceTestMenuScreen());
 
   void _openAppearance() => _push(const AppearanceScreen());
 
-  void _openAbout() => _push(
-    const _StubPage(
-      title: 'About StaffSync',
-      icon: Icons.info_outline_rounded,
-      description: 'StaffSync v1.0.0 · Check for updates and release notes.',
-    ),
-  );
+  void _openAbout() => _push(const AboutPage());
 
   void _openContact() => _push(
     const _StubPage(
@@ -342,30 +323,9 @@ class _SettingsPageState extends State<SettingsPage> {
     ),
   );
 
-  void _openTicket() => _push(
-    const _StubPage(
-      title: 'Raise a Support Ticket',
-      icon: Icons.confirmation_number_outlined,
-      description:
-      'Report an issue, attendance problem or app bug to the support team.',
-    ),
-  );
-
-  void _openFaq() => _push(
-    const _StubPage(
-      title: 'FAQs & User Guide',
-      icon: Icons.help_outline_rounded,
-      description: 'Common questions and step-by-step how-tos.',
-    ),
-  );
-
-  void _openFeedback() => _push(
-    const _StubPage(
-      title: 'Send Feedback',
-      icon: Icons.rate_review_outlined,
-      description: 'Tell us how we can improve StaffSync.',
-    ),
-  );
+  void _openTicket() => _push(const HelpSupportPage());
+  void _openFaq() => _push(const FAQScreen());
+  void _openFeedback() => _push(const FeedbackScreen());
 
   // ===================== BUILD =====================
   @override
@@ -430,6 +390,15 @@ class _SettingsPageState extends State<SettingsPage> {
                         value: _lockEnabled,
                         onChanged: _busy ? null : _toggleLock,
                         busy: _busy,
+                      ),
+                      _divider(),
+                      _buildNavTile(
+                        icon: Icons.face_retouching_natural_rounded,
+                        iconBg: const Color(0xFFF3E8FF),
+                        iconColor: const Color(0xFF9333EA),
+                        title: 'Face Biometric ID',
+                        subtitle: 'Register or update your face for punch-in',
+                        onTap: _openFaceEnrollment,
                       ),
                       _divider(),
                       _buildSwitchTile(
@@ -507,16 +476,6 @@ class _SettingsPageState extends State<SettingsPage> {
                         subtitle: 'Check-in location and radius',
                         onTap: _openGeofence,
                       ),
-                      _divider(),
-                      _buildNavTile(
-                        icon: Icons.system_update_outlined,
-                        iconBg: const Color(0xFFEFF6FF),
-                        iconColor: const Color(0xFF2563EB),
-                        title: 'New Build Available',
-                        subtitle:
-                        'Download the latest application update',
-                        onTap: _openNewBuild,
-                      ),
                     ],
                   ),
                 ),
@@ -592,11 +551,20 @@ class _SettingsPageState extends State<SettingsPage> {
                       ),
                       _divider(),
                       _buildNavTile(
+                        icon: Icons.system_update_outlined,
+                        iconBg: const Color(0xFFEFF6FF),
+                        iconColor: const Color(0xFF2563EB),
+                        title: 'Check for Updates',
+                        subtitle: 'Download latest application update',
+                        onTap: _openNewBuild,
+                      ),
+                      _divider(),
+                      _buildNavTile(
                         icon: Icons.info_outline_rounded,
                         iconBg: const Color(0xFFF3F4F6),
                         iconColor: const Color(0xFF6B7280),
                         title: 'About StaffSync',
-                        subtitle: 'Version 1.0.0 · Check for updates',
+                        subtitle: 'Version 1.0.0 · Information & licenses',
                         onTap: _openAbout,
                       ),
                     ],
@@ -646,6 +614,20 @@ class _SettingsPageState extends State<SettingsPage> {
                         onTap: _openFeedback,
                       ),
                     ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // ── 8. DIAGNOSTICS & TESTING ──
+                _buildSectionHeader('Diagnostics & Testing'),
+                _buildCard(
+                  child: _buildNavTile(
+                    icon: Icons.biotech_outlined,
+                    iconBg: const Color(0xFFEEF2FF),
+                    iconColor: const Color(0xFF4F46E5),
+                    title: 'Face Biometric Diagnostics',
+                    subtitle: 'Test face matching thresholds, lighting & 1:N tests',
+                    onTap: _openFaceTestMenu,
                   ),
                 ),
                 const SizedBox(height: 32),

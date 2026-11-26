@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../../providers/auth_provider.dart';
 import '../../utils/validators.dart';
+import '../services/auth_service.dart';
 import '../services/firebase_service.dart';
 import 'auth/TwoFactorScreen.dart';
 import 'splash_screen.dart';
@@ -56,12 +57,14 @@ class SavedProfile {
   final String displayName;
   final String? avatarUrl;
   final String password;
+  final String? organizationCode;
 
   SavedProfile({
     required this.employeeId,
     required this.displayName,
     this.avatarUrl,
     required this.password,
+    this.organizationCode,
   });
 
   Map<String, dynamic> toJson() => {
@@ -69,6 +72,7 @@ class SavedProfile {
     'displayName': displayName,
     'avatarUrl': avatarUrl,
     'password': password,
+    'organizationCode': organizationCode,
   };
 
   factory SavedProfile.fromJson(Map<String, dynamic> json) => SavedProfile(
@@ -76,6 +80,7 @@ class SavedProfile {
     displayName: json['displayName'] ?? '',
     avatarUrl: json['avatarUrl'],
     password: json['password'] ?? '',
+    organizationCode: json['organizationCode'],
   );
 }
 
@@ -207,6 +212,7 @@ class _SnapchatLoginScreenState extends State<SnapchatLoginScreen>
         profile.employeeId,
         profile.password,
         fcmToken: fcmToken,
+        organizationCode: profile.organizationCode,
       );
 
       if (!mounted) return;
@@ -894,6 +900,7 @@ class AddAccountScreen extends StatefulWidget {
 class _AddAccountScreenState extends State<AddAccountScreen>
     with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
+  final _companyCodeController = TextEditingController(text: 'STAFFSYNC');
   final _employeeIdController = TextEditingController();
   final _passwordController = TextEditingController();
   final _nameController = TextEditingController();
@@ -917,11 +924,21 @@ class _AddAccountScreenState extends State<AddAccountScreen>
       curve: Curves.easeOutCubic,
     ));
     _animController.forward();
+
+    // Restore last used organization code if available
+    AuthService().getOrganizationCode().then((code) {
+      if (code != null && code.isNotEmpty && mounted) {
+        setState(() {
+          _companyCodeController.text = code;
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
     _animController.dispose();
+    _companyCodeController.dispose();
     _employeeIdController.dispose();
     _passwordController.dispose();
     _nameController.dispose();
@@ -943,6 +960,7 @@ class _AddAccountScreenState extends State<AddAccountScreen>
       _employeeIdController.text.trim().toUpperCase(),
       _passwordController.text,
       fcmToken: fcmToken,
+      organizationCode: _companyCodeController.text.trim().toUpperCase(),
     );
 
     if (!mounted) return;
@@ -1003,6 +1021,7 @@ class _AddAccountScreenState extends State<AddAccountScreen>
         employeeId: employeeId,
         displayName: displayName,
         password: _passwordController.text,
+        organizationCode: _companyCodeController.text.trim().toUpperCase(),
       ),
     );
   }
@@ -1164,6 +1183,19 @@ class _AddAccountScreenState extends State<AddAccountScreen>
                         hint: 'How should we call you?',
                         icon: Icons.badge_outlined,
                         iconColor: _primary,
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Company Code
+                      _buildTextField(
+                        controller: _companyCodeController,
+                        label: 'Company Code',
+                        hint: 'e.g., STAFFSYNC',
+                        icon: Icons.business_outlined,
+                        iconColor: _primary,
+                        validator: Validators.required,
+                        keyboardType: TextInputType.text,
+                        textCapitalization: TextCapitalization.characters,
                       ),
                       const SizedBox(height: 20),
 

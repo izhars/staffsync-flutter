@@ -273,11 +273,14 @@ class NetworkService {
   // ---------------------------------------------------------
   Future<Map<String, String>> _headers() async {
     final token = await _authService.getToken();
+    final orgCode = await _authService.getOrganizationCode();
 
     return {
       HttpHeaders.contentTypeHeader: 'application/json',
       if (token != null && token.isNotEmpty)
         HttpHeaders.authorizationHeader: 'Bearer $token',
+      if (orgCode != null && orgCode.isNotEmpty)
+        'x-organization-code': orgCode,
     };
   }
 

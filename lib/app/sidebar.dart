@@ -1,19 +1,21 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:staffsync/screens/announcement_screen.dart';
+import 'package:staffsync/screens/celebration_screen.dart';
 import 'package:staffsync/screens/daily_task_screen.dart';
+import 'package:staffsync/screens/holiday_screen.dart';
+import 'package:staffsync/screens/leave_screen.dart';
 import 'package:staffsync/screens/onboarding_screen.dart';
+import 'package:staffsync/screens/payroll_screen.dart';
 import 'package:staffsync/screens/quotes_list_screen.dart';
+import 'package:staffsync/screens/report_screen.dart';
 import 'package:staffsync/screens/assets_screen.dart';
 import 'package:staffsync/screens/expense_list_screen.dart';
-import 'package:staffsync/screens/faq_screen.dart';
 import 'package:staffsync/screens/home_screen.dart';
 import 'package:staffsync/screens/notification_screen.dart';
 import 'package:staffsync/screens/profile_screen.dart';
 import '../screens/SettingsPage.dart';
-import '../screens/about_page.dart';
 import '../screens/chat_home_screen.dart';
-import '../screens/face/face_test_menu_screen.dart';
-import '../screens/help_and_support.dart';
 import '../screens/policy_screen.dart';
 import '../services/avatar_api.dart';
 
@@ -48,6 +50,7 @@ class SidebarDesign {
   static const Color danger = Color(0xFFDC2626);
   static const Color dangerSoft = Color(0xFFFEF2F2);
   static const Color dangerBorder = Color(0xFFFECACA);
+
 
   // Shadows
   static List<BoxShadow> get softShadow => [
@@ -445,90 +448,102 @@ class _SidebarState extends State<Sidebar> {
         children: [
           _buildSectionLabel('MAIN'),
           _buildMenuItem(
-            icon: Icons.home_outlined,
+            icon: Icons.dashboard_outlined,
             title: "Home",
             onTap: () => Navigator.pop(widget.parentContext),
           ),
           _buildMenuItem(
-            icon: Icons.person_outlined,
-            title: "Profile",
+            icon: Icons.person_outline_rounded,
+            title: "My Profile",
             onTap: _navigateToProfile,
           ),
           _buildMenuItem(
-            icon: Icons.open_in_browser,
-            title: "Onboarding",
-            onTap: _navigateToOnboarding,
-          ),
-          _buildMenuItem(
-            icon: Icons.notification_add_outlined,
-            title: "Notification",
+            icon: Icons.notifications_none_rounded,
+            title: "Notifications",
             onTap: () => _navigateTo(const NotificationScreen()),
           ),
 
           SizedBox(height: _isTablet ? 16 : 12),
-          _buildSectionLabel('WORK'),
+          _buildSectionLabel('HRMS & ATTENDANCE'),
           _buildMenuItem(
-            icon: Icons.monetization_on_outlined,
-            title: "Expenses",
-            onTap: () => _navigateTo(const ExpenseListScreen()),
+            icon: Icons.calendar_today_outlined,
+            title: "Attendance & Report",
+            onTap: () => _navigateTo(const ReportScreen()),
           ),
           _buildMenuItem(
-            icon: Icons.forum_outlined,
-            title: "Chat & Calls",
-            onTap: () => _navigateTo(const ChatHomeScreen()),
+            icon: Icons.time_to_leave_outlined,
+            title: "Leaves & Time Off",
+            onTap: () => _navigateTo(const LeavesScreen()),
           ),
           _buildMenuItem(
-            icon: Icons.work_outline_rounded,
-            title: "Project",
-            onTap: () => _navigateTo(HomeScreen()),
+            icon: Icons.celebration_outlined,
+            title: "Holiday Calendar",
+            onTap: () => _navigateTo(const PremiumHolidayCalendar()),
           ),
+          _buildMenuItem(
+            icon: Icons.receipt_long_outlined,
+            title: "Payroll & Payslips",
+            onTap: () => _navigateTo(const PayrollListScreen()),
+          ),
+
+          SizedBox(height: _isTablet ? 16 : 12),
+          _buildSectionLabel('WORK & PROJECTS'),
           _buildMenuItem(
             icon: Icons.task_alt_rounded,
-            title: "Task",
+            title: "Daily Tasks",
             onTap: () => _navigateTo(DailyTasksScreen()),
           ),
           _buildMenuItem(
-            icon: Icons.face_retouching_natural,
-            title: "Face",
-            onTap: () => _navigateTo(FaceTestMenuScreen()),
+            icon: Icons.work_outline_rounded,
+            title: "Projects",
+            onTap: () => _navigateTo(HomeScreen()),
+          ),
+          _buildMenuItem(
+            icon: Icons.monetization_on_outlined,
+            title: "Expenses & Claims",
+            onTap: () => _navigateTo(const ExpenseListScreen()),
+          ),
+          _buildMenuItem(
+            icon: Icons.chat_bubble_outline_rounded,
+            title: "Team Chat & Calls",
+            onTap: () => _navigateTo(const ChatHomeScreen()),
           ),
           _buildMenuItem(
             icon: Icons.devices_rounded,
-            title: "Assets",
+            title: "Company Assets",
             onTap: () => _navigateTo(const AssetsScreen()),
           ),
+
+          SizedBox(height: _isTablet ? 16 : 12),
+          _buildSectionLabel('ORGANIZATION & CULTURE'),
           _buildMenuItem(
-            icon: Icons.policy_outlined,
+            icon: Icons.assignment_turned_in_outlined,
+            title: "Onboarding & Docs",
+            onTap: _navigateToOnboarding,
+          ),
+          _buildMenuItem(
+            icon: Icons.menu_book_outlined,
             title: "Company Policies",
             onTap: () => _navigateTo(const PolicyScreen()),
           ),
-          SizedBox(height: _isTablet ? 16 : 12),
+          _buildMenuItem(
+            icon: Icons.campaign_outlined,
+            title: "Announcements",
+            onTap: () => _navigateTo(const AnnouncementsPage()),
+          ),
+          _buildMenuItem(
+            icon: Icons.cake_outlined,
+            title: "Celebrations",
+            onTap: () => _navigateTo(const CelebrationScreen()),
+          ),
           _buildMenuItem(
             icon: Icons.format_quote_rounded,
-            title: "Quotes",
+            title: "Daily Quotes",
             onTap: () => _navigateTo(const QuotesListScreen()),
           ),
 
           SizedBox(height: _isTablet ? 16 : 12),
-          _buildSectionLabel('SUPPORT'),
-          _buildMenuItem(
-            icon: Icons.help_outline_rounded,
-            title: "Help & Support",
-            onTap: () => _navigateTo(const HelpSupportPage()),
-          ),
-          _buildMenuItem(
-            icon: Icons.question_answer_outlined,
-            title: "FAQ",
-            onTap: () => _navigateTo(const FAQScreen()),
-          ),
-          _buildMenuItem(
-            icon: Icons.info_outline_rounded,
-            title: "About",
-            onTap: () => _navigateTo(const AboutPage()),
-          ),
-
-          SizedBox(height: _isTablet ? 16 : 12),
-          _buildSectionLabel('DEVELOPER'),
+          _buildSectionLabel('PREFERENCES'),
           _buildMenuItem(
             icon: Icons.settings_outlined,
             title: "Settings",
